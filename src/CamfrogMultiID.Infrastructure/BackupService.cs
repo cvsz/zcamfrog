@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using CamfrogMultiID.Core;
 using Microsoft.Data.Sqlite;
 
 namespace CamfrogMultiID.Infrastructure;
@@ -60,6 +61,47 @@ public static class BackupService
         var escaped = snapshotPath.Replace("'", "''", StringComparison.Ordinal);
         command.CommandText = $"VACUUM INTO '{escaped}';";
         command.ExecuteNonQuery();
+    }
+
+    public static string BackupsDirectory(AppPaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        var dir = Path.Combine(paths.Root, "backups");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    public static string DefaultBackupName(DateTime now) =>
+        $"CamfrogMultiID-backup-{now:yyyyMMdd-HHmmss}.zip";
+
+    public static int PruneBackups(string backupsDirectory, int keepCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(backupsDirectory);
+        ArgumentOutOfRangeException.ThrowIfNegative(keepCount);
+        if (!Directory.Exists(backupsDirectory))
+            return 0;
+        var files = Directory.GetFiles(backupsDirectory, "CamfrogMultiID-backup-*.zip")
+            .OrderByDescending(f => f, StringComparer.Ordinal)
+            .Skip(keepCount)
+            .ToList();
+        var removed = 0;
+        foreach (var file in files)
+        {
+            try { File.Delete(file); removed++; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return removed;
+    }
+
+    public static bool IsBackupDue(AppSettings settings, DateTime nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.AutoBackupDays <= 0)
+            return false;
+        if (settings.LastAutoBackupUtc is not DateTime last)
+            return true;
+        return (nowUtc - last.ToUniversalTime()).TotalDays >= settings.AutoBackupDays;
     }
 
     public static IReadOnlyList<string> ListEntries(string backupZip)

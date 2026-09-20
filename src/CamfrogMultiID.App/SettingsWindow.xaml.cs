@@ -17,6 +17,8 @@ public partial class SettingsWindow : Window
         Args.Text = settings.ClientArgumentsTemplate;
         SandboxBox.IsChecked = settings.UseSandboxie;
         SandboxExe.Text = settings.SandboxieStartExe;
+        BackupDays.Text = settings.AutoBackupDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        BackupKeep.Text = settings.AutoBackupKeepCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
         UpdateSandboxStatus();
         SandboxExe.TextChanged += (_, _) => UpdateSandboxStatus();
         if (settings.UseSandboxie && string.IsNullOrWhiteSpace(settings.SandboxieStartExe) && ProcessSessionService.FindSandboxieStart() is null)
@@ -195,6 +197,16 @@ public partial class SettingsWindow : Window
         var template = Args.Text.Trim();
         var useSandboxie = SandboxBox.IsChecked == true;
         var sandboxExe = SandboxExe.Text.Trim();
+        if (!int.TryParse(BackupDays.Text.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var backupDays) || backupDays < 0 || backupDays > 365)
+        {
+            MessageBox.Show("Auto-backup interval must be a number from 0 to 365 (0 = off).", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (!int.TryParse(BackupKeep.Text.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var backupKeep) || backupKeep < 1 || backupKeep > 100)
+        {
+            MessageBox.Show("Backups to keep must be a number from 1 to 100.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(executable) && !File.Exists(executable))
         {
             MessageBox.Show("The selected executable does not exist.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -222,7 +234,8 @@ public partial class SettingsWindow : Window
         }
         try
         {
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe });
+            var current = App.Settings.Load();
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc });
             App.Db.Log("INFO", "Settings saved.");
             DialogResult = true;
         }

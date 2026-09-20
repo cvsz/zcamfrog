@@ -35,6 +35,18 @@ public sealed class RestartPolicy
         }
     }
 
+    public int GetAttemptCount(long accountId, DateTime nowUtc)
+    {
+        lock (_gate)
+        {
+            if (!_attempts.TryGetValue(accountId, out var queue))
+                return 0;
+            while (queue.Count > 0 && (nowUtc - queue.Peek()) > Window)
+                queue.Dequeue();
+            return queue.Count;
+        }
+    }
+
     public void Reset(long accountId)
     {
         lock (_gate)

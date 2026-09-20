@@ -96,7 +96,8 @@ public sealed class DatabaseService
                     process_executable_path TEXT NOT NULL DEFAULT '',
                     last_error TEXT NOT NULL DEFAULT '',
                     room_url TEXT NOT NULL DEFAULT '',
-                    auto_restart INTEGER NOT NULL DEFAULT 0
+                    auto_restart INTEGER NOT NULL DEFAULT 0,
+                    password_changed_utc TEXT NOT NULL DEFAULT ''
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_username ON accounts(username COLLATE NOCASE);
                 CREATE TABLE IF NOT EXISTS events (
@@ -112,6 +113,7 @@ public sealed class DatabaseService
             EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(connection, "accounts", "password_changed_utc", "TEXT NOT NULL DEFAULT ''");
         }
     }
 
@@ -139,7 +141,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart,password_changed_utc
                 FROM accounts ORDER BY id;
                 """;
             using var reader = command.ExecuteReader();
@@ -161,12 +163,17 @@ public sealed class DatabaseService
                     ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
                     LastError = reader.GetString(10),
                     RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
-                    AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0
+                    AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0,
+                    PasswordChangedUtc = ReadNullableDate(reader, 13)
                 });
             }
             return result;
         }
     }
+
+    private static DateTime? ReadNullableDate(Microsoft.Data.Sqlite.SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) || string.IsNullOrWhiteSpace(reader.GetString(ordinal)) ? null :
+            (DateTime.TryParse(reader.GetString(ordinal), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) ? parsed : null);
 
     public bool UsernameExists(string username)
     {
@@ -205,7 +212,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart,password_changed_utc
                 FROM accounts WHERE id=$id;
                 """;
             command.Parameters.AddWithValue("$id", id);
@@ -222,12 +229,12 @@ public sealed class DatabaseService
                 Enabled = reader.GetInt64(5) != 0,
                 Status = reader.GetString(6),
                 ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                StartedAtUtc = reader.IsDBNull(8) ? null :
-                    DateTime.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
+                StartedAtUtc = ReadNullableDate(reader, 8),
                 ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
                 LastError = reader.GetString(10),
                 RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
-                AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0
+                AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0,
+                PasswordChangedUtc = ReadNullableDate(reader, 13)
             };
         }
     }
@@ -265,6 +272,22 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = "UPDATE accounts SET room_url=$r WHERE id=$id;";
             command.Parameters.AddWithValue("$r", roomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetPasswordChanged(long id, DateTime changedUtc)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET password_changed_utc=$t WHERE id=$id;";
+            command.Parameters.AddWithValue("$t", changedUtc.ToUniversalTime().ToString("O"));
             command.Parameters.AddWithValue("$id", id);
             var rows = command.ExecuteNonQuery();
             if (rows == 0)

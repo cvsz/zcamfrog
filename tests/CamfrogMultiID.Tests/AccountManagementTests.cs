@@ -243,6 +243,29 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void RestartPolicy_CountReflectsWindow()
+    {
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        Assert.Equal(0, policy.GetAttemptCount(20, now));
+        policy.ShouldRestart(20, now);
+        policy.ShouldRestart(20, now);
+        Assert.Equal(2, policy.GetAttemptCount(20, now.AddMinutes(1)));
+        Assert.Equal(0, policy.GetAttemptCount(20, now.AddMinutes(11)));
+    }
+
+    [Fact]
+    public void SetPasswordChanged_Persists()
+    {
+        var id = _db.Add(NewAccount("pwdage"));
+        Assert.Null(_db.GetById(id)!.PasswordChangedUtc);
+        var stamp = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        _db.SetPasswordChanged(id, stamp);
+        Assert.Equal(stamp, _db.GetById(id)!.PasswordChangedUtc);
+        Assert.Throws<InvalidOperationException>(() => _db.SetPasswordChanged(id + 9999, stamp));
+    }
+
+    [Fact]
     public void RestartPolicy_TracksAccountsSeparately()
     {
         var policy = new RestartPolicy();

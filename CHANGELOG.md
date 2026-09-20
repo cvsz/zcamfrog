@@ -18,6 +18,9 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - Backup/restore in Settings (zip of DB snapshot + secrets + settings; traversal validation; `ClearAllPools` so live DB restores)
 - Secrets-dir ACL restricted to current user; log export; screen-reader names; release provenance attestation
 - Deps: `System.IO.FileSystem.AccessControl` 5.0.0 (latest stable; no 8.x exists)
+- Health: uptime + restart-window counts in details; password-age with 90-day rotation notice (`password_changed_utc` migration)
+- Scheduled auto-backups (configurable days/keep, prune, startup-safe) + diagnostics bundle export (no secrets/usernames, no network)
+- `package-msix.ps1` path-ready (SDK-gated, unverified locally); release attestation bumped to v4 (Dependabot, merged)
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build

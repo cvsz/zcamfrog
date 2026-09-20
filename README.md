@@ -304,7 +304,7 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-69 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+74 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
 
 ## V17 reliability + backup
 

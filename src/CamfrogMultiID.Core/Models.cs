@@ -15,6 +15,7 @@ public sealed class CamfrogAccount
     public string LastError { get; set; } = string.Empty;
     public string RoomUrl { get; set; } = string.Empty;
     public bool AutoRestart { get; set; }
+    public DateTime? PasswordChangedUtc { get; set; }
 }
 
 public sealed class AppSettings
@@ -24,4 +25,7 @@ public sealed class AppSettings
     public string DataDirectory { get; set; } = string.Empty;
     public bool UseSandboxie { get; set; }
     public string SandboxieStartExe { get; set; } = string.Empty;
+    public int AutoBackupDays { get; set; }
+    public int AutoBackupKeepCount { get; set; } = 4;
+    public DateTime? LastAutoBackupUtc { get; set; }
 }

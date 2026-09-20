@@ -37,7 +37,30 @@ public partial class MainWindow : Window
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         RefreshRuntimeState();
+        RunAutoBackupIfDue();
         _timer.Start();
+    }
+
+    private static void RunAutoBackupIfDue()
+    {
+        try
+        {
+            var settings = App.Settings.Load();
+            if (!BackupService.IsBackupDue(settings, DateTime.UtcNow))
+                return;
+            var dir = BackupService.BackupsDirectory(App.Paths);
+            var dest = Path.Combine(dir, BackupService.DefaultBackupName(DateTime.Now));
+            BackupService.CreateBackup(App.Paths, dest);
+            BackupService.PruneBackups(dir, Math.Max(1, settings.AutoBackupKeepCount));
+            settings.LastAutoBackupUtc = DateTime.UtcNow;
+            App.Settings.Save(settings);
+            App.Db.Log("INFO", $"Automatic backup created: '{dest}'.");
+        }
+        catch (Exception ex)
+        {
+            // Backups must never break startup.
+            try { App.Db?.Log("ERROR", $"Automatic backup failed: {ex.Message}"); } catch { }
+        }
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -174,16 +197,34 @@ public partial class MainWindow : Window
         var secretExists = App.Credentials.Exists(account.PasswordSecretName);
         var profileExists = Directory.Exists(account.ProfileDirectory);
         var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+        var uptime = account.StartedAtUtc is DateTime started && account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase)
+            ? FormatDuration(DateTime.UtcNow - started.ToUniversalTime())
+            : "—";
+        var restarts = _restartPolicy.GetAttemptCount(account.Id, DateTime.UtcNow);
+        var passwordAge = account.PasswordChangedUtc is DateTime changed
+            ? $"{(int)(DateTime.UtcNow - changed.ToUniversalTime()).TotalDays}d" + ((DateTime.UtcNow - changed.ToUniversalTime()).TotalDays > 90 ? " (rotation recommended)" : string.Empty)
+            : "unknown";
         DetailsBox.Text =
             $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}  AutoRestart: {account.AutoRestart}\n" +
-            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}\n" +
+            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}  Uptime: {uptime}  Restarts(10m): {restarts}\n" +
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
             $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
-            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—" : account.RoomUrl)}\n" +
+            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—" : account.RoomUrl)}  Password age: {passwordAge}\n" +
             (settings.UseSandboxie
                 ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created — use Settings]")}\n"
                 : string.Empty) +
             $"Launch: {preview}";
+    }
+
+    private static string FormatDuration(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero)
+            span = TimeSpan.Zero;
+        return span.TotalHours >= 1
+            ? $"{(int)span.TotalHours}h {span.Minutes}m"
+            : span.TotalMinutes >= 1
+                ? $"{(int)span.TotalMinutes}m {span.Seconds}s"
+                : $"{(int)span.TotalSeconds}s";
     }
 
     private void UpdateStatusBar(List<CamfrogAccount> all)
@@ -360,6 +401,7 @@ public partial class MainWindow : Window
             try
             {
                 App.Credentials.Save(account.PasswordSecretName, dialog.NewPassword);
+                App.Db.SetPasswordChanged(account.Id, DateTime.UtcNow);
                 App.Db.Log("INFO", $"Password updated for '{account.DisplayName}'.");
                 MessageBox.Show("Password updated (DPAPI protected).", "Change Password",
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -419,6 +461,31 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Unable to export log.\n\n{ex.Message}", "Export Log",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void Diagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "Diagnostics (*.zip)|*.zip",
+            FileName = $"CamfrogMultiID-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.zip"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            DiagnosticsService.ExportBundle(App.Paths, App.Db, dialog.FileName);
+            App.Db.Log("INFO", $"Diagnostics bundle exported to '{dialog.FileName}'.");
+            MessageBox.Show(
+                $"Diagnostics bundle saved.\n\n{dialog.FileName}\n\nContains versions, account counts (no usernames), log, and settings. No passwords or secrets are included.",
+                "Diagnostics",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to export diagnostics.\n\n{ex.Message}", "Diagnostics",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

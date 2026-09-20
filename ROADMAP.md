@@ -17,8 +17,11 @@
 - [x] Security: secrets-dir ACL (current user only), audit via event log + log export
 - [x] Accessibility: screen-reader names on main controls, full keyboard operation
 - [x] Provenance: `attest-build-provenance` on release zips (verifies on first tag release)
-- [ ] Installer: MSIX / WiX bundle (optional)
-- [ ] Telemetry: opt-in anonymized diagnostics (no secrets)
+- [x] Diagnostics: opt-in local bundle (versions, counts, log, settings; no secrets/usernames, no network)
+- [x] Health: uptime + restart counts surfaced; password-age rotation notice
+- [x] Scheduled backups with pruning
+- [~] Installer: `package-msix.ps1` path-ready (needs Windows SDK + cert; unverified here, zip stays primary)
+- [ ] Telemetry: networked opt-in diagnostics (no discretionary need while local bundle exists)
 - [ ] Localization (resources)
 
 ## Future considerations

@@ -113,6 +113,7 @@ public partial class AccountWindow : Window
                     Directory.CreateDirectory(profile);
                     App.Credentials.Save(secret, password);
                     account.Id = App.Db.Add(account);
+                    App.Db.SetPasswordChanged(account.Id, DateTime.UtcNow);
                     App.Db.Log("INFO", $"Added account '{account.DisplayName}'.");
                     DialogResult = true;
                 }
@@ -136,6 +137,7 @@ public partial class AccountWindow : Window
                 if (!string.IsNullOrEmpty(password))
                 {
                     App.Credentials.Save(existing.PasswordSecretName, password);
+                    App.Db.SetPasswordChanged(existing.Id, DateTime.UtcNow);
                 }
 
                 App.Db.UpdateDetails(existing.Id, displayName, username, enabled);

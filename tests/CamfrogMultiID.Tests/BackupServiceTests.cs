@@ -59,6 +59,33 @@ public sealed class BackupServiceTests : IDisposable
     }
 
     [Fact]
+    public void IsBackupDue_RespectsSchedule()
+    {
+        var settings = new CamfrogMultiID.Core.AppSettings { AutoBackupDays = 0 };
+        Assert.False(BackupService.IsBackupDue(settings, DateTime.UtcNow));
+        settings.AutoBackupDays = 7;
+        Assert.True(BackupService.IsBackupDue(settings, DateTime.UtcNow));
+        settings.LastAutoBackupUtc = DateTime.UtcNow;
+        Assert.False(BackupService.IsBackupDue(settings, DateTime.UtcNow));
+        settings.LastAutoBackupUtc = DateTime.UtcNow.AddDays(-8);
+        Assert.True(BackupService.IsBackupDue(settings, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void PruneBackups_KeepsNewest()
+    {
+        var dir = Path.Combine(_tempRoot, "prune");
+        Directory.CreateDirectory(dir);
+        foreach (var name in new[] { "CamfrogMultiID-backup-20260101-000000.zip", "CamfrogMultiID-backup-20260102-000000.zip", "CamfrogMultiID-backup-20260103-000000.zip", "other.txt" })
+            File.WriteAllText(Path.Combine(dir, name), "x");
+        Assert.Equal(1, BackupService.PruneBackups(dir, 2));
+        Assert.True(File.Exists(Path.Combine(dir, "CamfrogMultiID-backup-20260103-000000.zip")));
+        Assert.True(File.Exists(Path.Combine(dir, "CamfrogMultiID-backup-20260102-000000.zip")));
+        Assert.True(File.Exists(Path.Combine(dir, "other.txt")));
+        Assert.Equal(0, BackupService.PruneBackups(Path.Combine(_tempRoot, "missing"), 2));
+    }
+
+    [Fact]
     public void ValidateBackup_RejectsMissingDatabase()
     {
         var zip = Path.Combine(_tempRoot, "nodata.zip");
