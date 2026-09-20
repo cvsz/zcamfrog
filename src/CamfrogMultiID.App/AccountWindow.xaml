@@ -21,7 +21,7 @@
             <TextBlock x:Name="PasswordHint" Text="Stored with Windows DPAPI (CurrentUser). Never logged or passed on the command line." Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,10"/>
             <TextBlock Text="Room URL (optional, camfrog: link to auto-join)" Margin="0,0,0,5"/>
             <TextBox x:Name="RoomUrlTextBox" Height="30" Margin="0,0,0,4" MaxLength="500"/>
-            <TextBlock Text="Copy the room link from the client room directory. Only the camfrog: scheme is accepted." Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,10"/>
+            <TextBlock Text="From camfrog.com room join links, e.g. camfrog://join_room/?name=RoomName. Only the camfrog: scheme is accepted." Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,10"/>
             <CheckBox x:Name="EnabledCheckBox" Content="Enabled" IsChecked="True"/>
         </StackPanel>
         <TextBlock Grid.Row="6" x:Name="EditHint" Text="" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
