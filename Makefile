@@ -24,7 +24,7 @@ lint:
 	dotnet build CamfrogMultiID.sln -c Release --no-restore -warnaserror
 
 security:
-	@set -e; if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md'; then exit 1; fi
+	@set -e; if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md' ':!.github/workflows/ci.yml' ':!Makefile'; then exit 1; fi
 	@echo 'Static security marker scan passed.'
 
 ci: restore build test lint security
