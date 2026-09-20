@@ -1,5 +1,6 @@
-# Replace or extend ownership rules for generated repositories.
+# Camfrog Multi-ID Manager ownership
 * @cvsz
 
 /.github/ @cvsz
 /SECURITY.md @cvsz
+/.github/CODEOWNERS @cvsz
