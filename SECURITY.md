@@ -34,3 +34,7 @@ For a confirmed security issue:
 3. Remediate and add regression coverage.
 4. Validate with clean build, tests, and security workflows.
 5. Publish release notes without exposing exploit details.
+
+## Project-specific security boundary
+
+Camfrog Multi-ID Manager is a local process manager. It does not bypass authentication, CAPTCHA, licensing, rate limits, or other Camfrog access controls, and stored passwords are not automatically submitted to the client.
