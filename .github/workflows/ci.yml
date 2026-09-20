@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' --             ':!CHANGELOG.md'             ':!.github/workflows/ci.yml'             ':!Makefile'; then
+          if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md' ':!.github/workflows/ci.yml' ':!Makefile'; then
             echo 'Unfinished/template implementation marker found.'
             exit 1
           fi
