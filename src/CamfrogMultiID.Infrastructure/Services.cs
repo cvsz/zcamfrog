@@ -30,6 +30,32 @@ public sealed class AppPaths
         Directory.CreateDirectory(Profiles);
         Directory.CreateDirectory(Secrets);
         Directory.CreateDirectory(Logs);
+        RestrictSecretsAccess();
+    }
+
+    private void RestrictSecretsAccess()
+    {
+        // Best-effort: DPAPI blobs should be reachable only by the current user.
+        // Never let an ACL failure break startup.
+        try
+        {
+            var identity = System.Security.Principal.WindowsIdentity.GetCurrent()?.Name;
+            if (string.IsNullOrWhiteSpace(identity))
+                return;
+            var security = new DirectoryInfo(Secrets).GetAccessControl();
+            security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                identity,
+                System.Security.AccessControl.FileSystemRights.FullControl,
+                System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                System.Security.AccessControl.PropagationFlags.None,
+                System.Security.AccessControl.AccessControlType.Allow));
+            new DirectoryInfo(Secrets).SetAccessControl(security);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (PlatformNotSupportedException) { }
+        catch (InvalidOperationException) { }
     }
 }
 
@@ -69,7 +95,8 @@ public sealed class DatabaseService
                     started_utc TEXT,
                     process_executable_path TEXT NOT NULL DEFAULT '',
                     last_error TEXT NOT NULL DEFAULT '',
-                    room_url TEXT NOT NULL DEFAULT ''
+                    room_url TEXT NOT NULL DEFAULT '',
+                    auto_restart INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_username ON accounts(username COLLATE NOCASE);
                 CREATE TABLE IF NOT EXISTS events (
@@ -84,6 +111,7 @@ public sealed class DatabaseService
             // Forward-compatible migration for databases created by older builds.
             EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
         }
     }
 
@@ -111,7 +139,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart
                 FROM accounts ORDER BY id;
                 """;
             using var reader = command.ExecuteReader();
@@ -132,7 +160,8 @@ public sealed class DatabaseService
                         (DateTime.TryParse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedStart) ? parsedStart : null),
                     ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
                     LastError = reader.GetString(10),
-                    RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11)
+                    RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+                    AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0
                 });
             }
             return result;
@@ -176,7 +205,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart
                 FROM accounts WHERE id=$id;
                 """;
             command.Parameters.AddWithValue("$id", id);
@@ -197,7 +226,8 @@ public sealed class DatabaseService
                     DateTime.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
                 ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
                 LastError = reader.GetString(10),
-                RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11)
+                RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+                AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0
             };
         }
     }
@@ -235,6 +265,22 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = "UPDATE accounts SET room_url=$r WHERE id=$id;";
             command.Parameters.AddWithValue("$r", roomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetAutoRestart(long id, bool autoRestart)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET auto_restart=$a WHERE id=$id;";
+            command.Parameters.AddWithValue("$a", autoRestart ? 1 : 0);
             command.Parameters.AddWithValue("$id", id);
             var rows = command.ExecuteNonQuery();
             if (rows == 0)
@@ -292,8 +338,8 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO accounts
-                    (display_name,username,secret_name,profile_directory,enabled,room_url)
-                VALUES($d,$u,$s,$p,$e,$r);
+                    (display_name,username,secret_name,profile_directory,enabled,room_url,auto_restart)
+                VALUES($d,$u,$s,$p,$e,$r,$a);
                 SELECT last_insert_rowid();
                 """;
             command.Parameters.AddWithValue("$d", account.DisplayName);
@@ -302,6 +348,7 @@ public sealed class DatabaseService
             command.Parameters.AddWithValue("$p", account.ProfileDirectory);
             command.Parameters.AddWithValue("$e", account.Enabled ? 1 : 0);
             command.Parameters.AddWithValue("$r", account.RoomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$a", account.AutoRestart ? 1 : 0);
             return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }

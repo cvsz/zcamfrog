@@ -12,6 +12,7 @@ namespace CamfrogMultiID.App;
 public partial class MainWindow : Window
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly RestartPolicy _restartPolicy = new();
     private bool _refreshing;
     private bool _initialized;
     private string _logLevelFilter = "All";
@@ -22,6 +23,11 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closed += (_, _) => _timer.Stop();
         _timer.Tick += (_, _) => RefreshRuntimeState();
+        // Screen-reader names for controls whose purpose is not in their text.
+        System.Windows.Automation.AutomationProperties.SetName(SearchBox, "Search accounts");
+        System.Windows.Automation.AutomationProperties.SetName(AccountsGrid, "Accounts");
+        System.Windows.Automation.AutomationProperties.SetName(LogBox, "Application log");
+        System.Windows.Automation.AutomationProperties.SetName(DetailsBox, "Selected account details");
         // SelectionChanged/TextChanged fire during InitializeComponent (XAML default
         // selection); ignore them until construction is complete. See startup-error.log
         // NullReferenceException at UpdateLogBox via LogLevelBox_SelectionChanged.
@@ -86,16 +92,36 @@ public partial class MainWindow : Window
         {
             var selectedId = (AccountsGrid.SelectedItem as CamfrogAccount)?.Id;
 
+            var settings = App.Settings.Load();
             foreach (var account in App.Db.GetAccounts())
             {
                 if (account.ProcessId is not int || !account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (!ProcessSessionService.IsTrackedProcessAlive(account, out var reason))
+                if (ProcessSessionService.IsTrackedProcessAlive(account, out _))
+                    continue;
+
+                var reason = "Process exited.";
+                if (account.Enabled && account.AutoRestart)
                 {
-                    App.Db.UpdateRuntime(account.Id, "Stopped", null, null, reason ?? "Process exited.");
-                    App.Db.Log("INFO", $"{account.DisplayName}: {reason ?? "Process exited."}");
+                    if (_restartPolicy.ShouldRestart(account.Id, DateTime.UtcNow))
+                    {
+                        App.Db.Log("INFO", $"{account.DisplayName}: {reason} Attempting auto-restart.");
+                        if (TryStartAccount(account, settings, interactive: false))
+                        {
+                            App.Db.Log("INFO", $"{account.DisplayName}: auto-restarted.");
+                            continue;
+                        }
+                        continue;
+                    }
+
+                    App.Db.UpdateRuntime(account.Id, "Error", null, null, "Auto-restart paused: too many restarts in a short time.");
+                    App.Db.Log("WARN", $"{account.DisplayName}: auto-restart paused (restart loop suspected).");
+                    continue;
                 }
+
+                App.Db.UpdateRuntime(account.Id, "Stopped", null, null, reason);
+                App.Db.Log("INFO", $"{account.DisplayName}: {reason}");
             }
 
             var all = App.Db.GetAccounts();
@@ -149,7 +175,7 @@ public partial class MainWindow : Window
         var profileExists = Directory.Exists(account.ProfileDirectory);
         var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
         DetailsBox.Text =
-            $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}\n" +
+            $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}  AutoRestart: {account.AutoRestart}\n" +
             $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}\n" +
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
             $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
@@ -369,6 +395,34 @@ public partial class MainWindow : Window
 
     private void ClearLogView_Click(object sender, RoutedEventArgs e) => LogBox.Clear();
 
+    private void ExportLog_Click(object sender, RoutedEventArgs e)
+    {
+        var source = Path.Combine(App.Paths.Logs, "app.log");
+        if (!File.Exists(source))
+        {
+            MessageBox.Show("No log file exists yet.", "Export Log",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "Log (*.log)|*.log",
+            FileName = $"CamfrogMultiID-{DateTime.Now:yyyyMMdd-HHmmss}.log"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            File.Copy(source, dialog.FileName, overwrite: true);
+            App.Db.Log("INFO", $"Log exported to '{dialog.FileName}'.");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to export log.\n\n{ex.Message}", "Export Log",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -446,37 +500,45 @@ public partial class MainWindow : Window
         RefreshRuntimeState();
     }
 
-    private static void StartAccount(CamfrogAccount account, AppSettings? settings = null)
-    {
-        settings ??= App.Settings.Load();
+    private void StartAccount(CamfrogAccount account, AppSettings? settings = null) =>
+        TryStartAccount(account, settings ?? App.Settings.Load(), interactive: true);
 
+    private bool TryStartAccount(CamfrogAccount account, AppSettings settings, bool interactive)
+    {
         try
         {
             if (account.ProcessId is int)
             {
                 if (ProcessSessionService.IsTrackedProcessAlive(account, out _))
-                    return;
+                    return true;
 
                 App.Db.UpdateRuntime(account.Id, "Stopped", null, null);
             }
 
             App.Sessions.Start(account, settings);
+            _restartPolicy.Reset(account.Id);
+            return true;
         }
         catch (Exception ex)
         {
             App.Db.UpdateRuntime(account.Id, "Error", null, null, ex.Message);
             App.Db.Log("ERROR", $"{account.DisplayName}: {ex.Message}");
-            MessageBox.Show(
-                $"Unable to start '{account.DisplayName}'.\n\n{ex.Message}",
-                "Start Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (interactive)
+            {
+                MessageBox.Show(
+                    $"Unable to start '{account.DisplayName}'.\n\n{ex.Message}",
+                    "Start Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            return false;
         }
     }
 
-    private static void StopAccount(CamfrogAccount account)
+    private void StopAccount(CamfrogAccount account)
     {
         try
         {
             App.Sessions.Stop(account);
+            _restartPolicy.Reset(account.Id);
         }
         catch (Exception ex)
         {

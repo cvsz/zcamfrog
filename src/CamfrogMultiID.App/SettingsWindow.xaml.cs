@@ -136,6 +136,57 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void Backup_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Backup (*.zip)|*.zip",
+            FileName = $"CamfrogMultiID-backup-{DateTime.Now:yyyyMMdd-HHmmss}.zip"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            BackupService.CreateBackup(App.Paths, dialog.FileName);
+            App.Db.Log("INFO", $"Data backed up to '{dialog.FileName}'.");
+            MessageBox.Show($"Backup saved.\n\n{dialog.FileName}\n\nIncludes database, secrets, and settings. Profile directories are excluded.", "Backup", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to create backup.\n\n{ex.Message}", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void Restore_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Backup (*.zip)|*.zip", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        var confirm = MessageBox.Show(
+            "Restore replaces the current database, secrets, and settings. Stop all running clients first.\n\nContinue?",
+            "Confirm Restore",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+        try
+        {
+            foreach (var account in App.Db.GetAccounts())
+            {
+                if (account.ProcessId is int)
+                    App.Sessions.Stop(account);
+            }
+            BackupService.RestoreBackup(App.Paths, dialog.FileName);
+            App.Db.Log("INFO", $"Data restored from '{dialog.FileName}'.");
+            MessageBox.Show("Restore complete. The account list will refresh.", "Restore", MessageBoxButton.OK, MessageBoxImage.Information);
+            DialogResult = true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to restore backup.\n\n{ex.Message}", "Restore Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 
     private void Save_Click(object sender, RoutedEventArgs e)

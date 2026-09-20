@@ -14,6 +14,10 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - Sandbox multi-instance (experimental): optional Sandboxie-Plus launch per account (`Start.exe /wait /Box:<user>`, box name sanitized); env-redirection alone proven insufficient (client mutex, PID 7364 test)
 - Auto-join rooms: per-account `RoomUrl` (`camfrog:` scheme validated) appended as `--url=` (registry-verified client switch); launch preview shows full sandboxed command
 - Sandboxie onboarding: status + one-click download + Create-Boxes-For-All in Settings, box state in details panel, `SandboxieService` (boxes root, exists, create), `bundle-setup.ps1/.cmd` (Sandboxie-Plus + manager bundle with checksum)
+- Auto-restart (opt-in per account, `RestartPolicy`: 3 per 10 min, loop pauses to Error, silent timer path, budget reset on manual start/stop)
+- Backup/restore in Settings (zip of DB snapshot + secrets + settings; traversal validation; `ClearAllPools` so live DB restores)
+- Secrets-dir ACL restricted to current user; log export; screen-reader names; release provenance attestation
+- Deps: `System.IO.FileSystem.AccessControl` 5.0.0 (latest stable; no 8.x exists)
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build

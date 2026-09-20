@@ -12,11 +12,14 @@
 - [x] UI: edit/delete account, enable/disable, search/filter
 - [x] UI: per-account launch arguments preview and validation
 - [x] UI: selected-account details, status bar, log filter, context menu + shortcuts, change password, clear error
-- [ ] Process: auto-restart on crash (opt-in), health dashboard
-- [ ] Persistence: backup/restore of `camfrog.db` and `secrets/`
-- [ ] Security: additional hardening (ACL on secrets, audit log)
+- [x] Process: auto-restart on crash (opt-in, 3-per-10-min loop guard), health via details + status bar
+- [x] Persistence: backup/restore of `camfrog.db` and `secrets/` (traversal-safe zip, `VACUUM INTO` snapshot)
+- [x] Security: secrets-dir ACL (current user only), audit via event log + log export
+- [x] Accessibility: screen-reader names on main controls, full keyboard operation
+- [x] Provenance: `attest-build-provenance` on release zips (verifies on first tag release)
 - [ ] Installer: MSIX / WiX bundle (optional)
 - [ ] Telemetry: opt-in anonymized diagnostics (no secrets)
+- [ ] Localization (resources)
 
 ## Future considerations
 - [ ] Support for Camfrog client variants (if documented CLI changes)

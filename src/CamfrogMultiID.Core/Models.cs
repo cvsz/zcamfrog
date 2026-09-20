@@ -14,6 +14,7 @@ public sealed class CamfrogAccount
     public string ProcessExecutablePath { get; set; } = string.Empty;
     public string LastError { get; set; } = string.Empty;
     public string RoomUrl { get; set; } = string.Empty;
+    public bool AutoRestart { get; set; }
 }
 
 public sealed class AppSettings

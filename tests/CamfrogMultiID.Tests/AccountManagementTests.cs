@@ -206,6 +206,53 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void SetAutoRestart_Persists()
+    {
+        var id = _db.Add(NewAccount("autorestart"));
+        Assert.False(_db.GetById(id)!.AutoRestart);
+        _db.SetAutoRestart(id, true);
+        Assert.True(_db.GetById(id)!.AutoRestart);
+        _db.SetAutoRestart(id, false);
+        Assert.False(_db.GetById(id)!.AutoRestart);
+        Assert.Throws<InvalidOperationException>(() => _db.SetAutoRestart(id + 9999, true));
+    }
+
+    [Fact]
+    public void RestartPolicy_AllowsThreeThenBlocks()
+    {
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        Assert.True(policy.ShouldRestart(1, now));
+        Assert.True(policy.ShouldRestart(1, now.AddMinutes(1)));
+        Assert.True(policy.ShouldRestart(1, now.AddMinutes(2)));
+        Assert.False(policy.ShouldRestart(1, now.AddMinutes(3)));
+        policy.Reset(1);
+        Assert.True(policy.ShouldRestart(1, now.AddMinutes(4)));
+    }
+
+    [Fact]
+    public void RestartPolicy_WindowExpiryFreesBudget()
+    {
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        Assert.True(policy.ShouldRestart(2, now));
+        Assert.True(policy.ShouldRestart(2, now));
+        Assert.True(policy.ShouldRestart(2, now));
+        Assert.False(policy.ShouldRestart(2, now));
+        Assert.True(policy.ShouldRestart(2, now.AddMinutes(11)));
+    }
+
+    [Fact]
+    public void RestartPolicy_TracksAccountsSeparately()
+    {
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        Assert.True(policy.ShouldRestart(10, now));
+        Assert.True(policy.ShouldRestart(11, now));
+        Assert.Throws<ArgumentOutOfRangeException>(() => policy.ShouldRestart(0, now));
+    }
+
+    [Fact]
     public void PreviewLaunch_IncludesRoomAndSandbox()
     {
         var acc = new CamfrogAccount { Id = 1, Username = "u1", ProfileDirectory = @"C:\p\1", RoomUrl = "camfrog://room/R" };

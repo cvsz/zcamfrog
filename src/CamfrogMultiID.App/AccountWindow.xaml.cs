@@ -20,6 +20,7 @@ public partial class AccountWindow : Window
         UsernameTextBox.Text = existing.Username;
         RoomUrlTextBox.Text = existing.RoomUrl;
         EnabledCheckBox.IsChecked = existing.Enabled;
+        AutoRestartCheckBox.IsChecked = existing.AutoRestart;
         PasswordLabel.Text = "New password (leave blank to keep current)";
         PasswordHint.Text = "Leave blank to keep the stored DPAPI password. Enter a value to replace it.";
         EditHint.Text = $"Profile: {existing.ProfileDirectory}";
@@ -67,6 +68,7 @@ public partial class AccountWindow : Window
         }
 
         var enabled = EnabledCheckBox.IsChecked == true;
+        var autoRestart = AutoRestartCheckBox.IsChecked == true;
         var roomUrl = RoomUrlTextBox.Text.Trim();
         if (!string.IsNullOrEmpty(roomUrl))
         {
@@ -102,7 +104,8 @@ public partial class AccountWindow : Window
                     PasswordSecretName = secret,
                     ProfileDirectory = profile,
                     Enabled = enabled,
-                    RoomUrl = roomUrl
+                    RoomUrl = roomUrl,
+                    AutoRestart = autoRestart
                 };
 
                 try
@@ -137,6 +140,7 @@ public partial class AccountWindow : Window
 
                 App.Db.UpdateDetails(existing.Id, displayName, username, enabled);
                 App.Db.SetRoomUrl(existing.Id, roomUrl);
+                App.Db.SetAutoRestart(existing.Id, autoRestart);
                 App.Db.Log("INFO", $"Updated account '{displayName}' (id {existing.Id}).");
                 DialogResult = true;
             }

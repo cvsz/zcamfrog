@@ -63,6 +63,7 @@
                         </ComboBox>
                         <CheckBox x:Name="AutoScrollBox" Content="Auto-scroll" IsChecked="True" VerticalAlignment="Center" Margin="12,0,0,0"/>
                         <Button Content="Clear Log View" Click="ClearLogView_Click" Margin="12,0,0,0"/>
+                        <Button Content="Export Log..." Click="ExportLog_Click" Margin="4,0,0,0"/>
                         <Button Content="Open Log Folder" Click="OpenLogFolder_Click" Margin="4,0,0,0"/>
                     </StackPanel>
                     <TextBox x:Name="LogBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="6" FontFamily="Consolas"/>

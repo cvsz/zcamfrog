@@ -304,7 +304,14 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-60 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+69 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+
+## V17 reliability + backup
+
+- **Auto-restart (opt-in):** tick per account in Add/Edit. If the tracked client exits, the 2s reconciler restarts it silently (no popups from the timer); more than 3 restarts in 10 minutes pauses with an `Error` status and `WARN` log instead of looping forever. Manual start/stop resets the budget.
+- **Backup/restore (Settings):** zips a `VACUUM INTO` snapshot of the live database (pooled connections lock the live file, so direct zipping fails) plus secrets and settings; profile dirs excluded. Restore validates every zip entry against path traversal, stops tracked clients, and replaces data.
+- **Secrets ACL:** `%LOCALAPPDATA%\CamfrogMultiID\secrets\` is restricted to the current Windows user on startup (in addition to DPAPI).
+- **Audit:** every lifecycle operation already logs to DB + file; added one-click log export next to the log filter.
 
 ## V16 Sandboxie onboarding + bundle
 
