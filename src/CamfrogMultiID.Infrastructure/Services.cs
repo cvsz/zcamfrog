@@ -195,7 +195,7 @@ public sealed class DatabaseService
 
     public void Delete(long id)
     {
-        if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
 
         lock (_gate)
         {
