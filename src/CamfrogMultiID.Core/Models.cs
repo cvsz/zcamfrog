@@ -1,0 +1,23 @@
+namespace CamfrogMultiID.Core;
+
+public sealed class CamfrogAccount
+{
+    public long Id { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string PasswordSecretName { get; set; } = string.Empty;
+    public string ProfileDirectory { get; set; } = string.Empty;
+    public bool Enabled { get; set; } = true;
+    public string Status { get; set; } = "Stopped";
+    public int? ProcessId { get; set; }
+    public DateTime? StartedAtUtc { get; set; }
+    public string ProcessExecutablePath { get; set; } = string.Empty;
+    public string LastError { get; set; } = string.Empty;
+}
+
+public sealed class AppSettings
+{
+    public string ClientExecutable { get; set; } = string.Empty;
+    public string ClientArgumentsTemplate { get; set; } = string.Empty;
+    public string DataDirectory { get; set; } = string.Empty;
+}
