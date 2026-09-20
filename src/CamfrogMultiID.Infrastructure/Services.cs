@@ -68,7 +68,8 @@ public sealed class DatabaseService
                     process_id INTEGER,
                     started_utc TEXT,
                     process_executable_path TEXT NOT NULL DEFAULT '',
-                    last_error TEXT NOT NULL DEFAULT ''
+                    last_error TEXT NOT NULL DEFAULT '',
+                    room_url TEXT NOT NULL DEFAULT ''
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_username ON accounts(username COLLATE NOCASE);
                 CREATE TABLE IF NOT EXISTS events (
@@ -82,6 +83,7 @@ public sealed class DatabaseService
 
             // Forward-compatible migration for databases created by older builds.
             EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
         }
     }
 
@@ -109,7 +111,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url
                 FROM accounts ORDER BY id;
                 """;
             using var reader = command.ExecuteReader();
@@ -129,7 +131,8 @@ public sealed class DatabaseService
                     StartedAtUtc = reader.IsDBNull(8) ? null :
                         (DateTime.TryParse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedStart) ? parsedStart : null),
                     ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-                    LastError = reader.GetString(10)
+                    LastError = reader.GetString(10),
+                    RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11)
                 });
             }
             return result;
@@ -173,7 +176,7 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url
                 FROM accounts WHERE id=$id;
                 """;
             command.Parameters.AddWithValue("$id", id);
@@ -193,7 +196,8 @@ public sealed class DatabaseService
                 StartedAtUtc = reader.IsDBNull(8) ? null :
                     DateTime.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
                 ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-                LastError = reader.GetString(10)
+                LastError = reader.GetString(10),
+                RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11)
             };
         }
     }
@@ -215,6 +219,22 @@ public sealed class DatabaseService
             command.Parameters.AddWithValue("$d", displayName.Trim());
             command.Parameters.AddWithValue("$u", username.Trim());
             command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetRoomUrl(long id, string roomUrl)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET room_url=$r WHERE id=$id;";
+            command.Parameters.AddWithValue("$r", roomUrl ?? string.Empty);
             command.Parameters.AddWithValue("$id", id);
             var rows = command.ExecuteNonQuery();
             if (rows == 0)
@@ -272,8 +292,8 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO accounts
-                    (display_name,username,secret_name,profile_directory,enabled)
-                VALUES($d,$u,$s,$p,$e);
+                    (display_name,username,secret_name,profile_directory,enabled,room_url)
+                VALUES($d,$u,$s,$p,$e,$r);
                 SELECT last_insert_rowid();
                 """;
             command.Parameters.AddWithValue("$d", account.DisplayName);
@@ -281,6 +301,7 @@ public sealed class DatabaseService
             command.Parameters.AddWithValue("$s", account.PasswordSecretName);
             command.Parameters.AddWithValue("$p", account.ProfileDirectory);
             command.Parameters.AddWithValue("$e", account.Enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$r", account.RoomUrl ?? string.Empty);
             return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }
@@ -500,14 +521,42 @@ public sealed class ProcessSessionService
         Directory.CreateDirectory(account.ProfileDirectory);
 
         var args = ExpandArguments(settings.ClientArgumentsTemplate, account);
-        var workingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory;
-        var psi = new ProcessStartInfo
+        if (!string.IsNullOrWhiteSpace(account.RoomUrl))
+            args = string.IsNullOrWhiteSpace(args)
+                ? $"--url={Quote(NormalizeRoomUrl(account.RoomUrl))}"
+                : $"{args} --url={Quote(NormalizeRoomUrl(account.RoomUrl))}";
+
+        var trackedExecutable = executable;
+        ProcessStartInfo psi;
+        if (settings.UseSandboxie)
         {
-            FileName = executable,
-            Arguments = args,
-            UseShellExecute = true,
-            WorkingDirectory = workingDirectory
-        };
+            var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
+                ? FindSandboxieStart()
+                : Path.GetFullPath(settings.SandboxieStartExe);
+            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+                throw new FileNotFoundException("Sandboxie Start.exe was not found. Install Sandboxie-Plus or configure its path in Settings.", startExe ?? string.Empty);
+            trackedExecutable = startExe;
+            psi = new ProcessStartInfo
+            {
+                FileName = startExe,
+                // /wait keeps Start.exe alive while the sandboxed client runs, so the
+                // tracked PID stays valid for the whole session.
+                Arguments = $"/wait /Box:{Quote(SanitizeBoxName(account))} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory
+            };
+        }
+        else
+        {
+            var workingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory;
+            psi = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = args,
+                UseShellExecute = true,
+                WorkingDirectory = workingDirectory
+            };
+        }
 
         var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Could not start the client process.");
@@ -520,11 +569,11 @@ public sealed class ProcessSessionService
         account.StartedAtUtc = startedUtc;
         account.Status = "Running";
         account.LastError = string.Empty;
-        account.ProcessExecutablePath = executable;
+        account.ProcessExecutablePath = trackedExecutable;
 
         try
         {
-            _database.UpdateRuntime(account.Id, "Running", process.Id, startedUtc, "", executable);
+            _database.UpdateRuntime(account.Id, "Running", process.Id, startedUtc, "", trackedExecutable);
         }
         catch
         {
@@ -673,7 +722,60 @@ public sealed class ProcessSessionService
         ArgumentNullException.ThrowIfNull(account);
         var exe = string.IsNullOrWhiteSpace(executable) ? "<client-exe>" : executable.Trim();
         var args = ExpandArguments(template, account);
+        if (!string.IsNullOrWhiteSpace(account.RoomUrl))
+            args = string.IsNullOrWhiteSpace(args)
+                ? $"--url={Quote(account.RoomUrl.Trim())}"
+                : $"{args} --url={Quote(account.RoomUrl.Trim())}";
         return string.IsNullOrWhiteSpace(args) ? $"\"{exe}\"" : $"\"{exe}\" {args}";
+    }
+
+    public static string PreviewLaunch(AppSettings settings, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(account);
+        var inner = PreviewCommandLine(settings.ClientExecutable, settings.ClientArgumentsTemplate, account);
+        if (!settings.UseSandboxie)
+            return inner;
+        var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe) ? FindSandboxieStart() ?? "<Start.exe>" : settings.SandboxieStartExe;
+        return $"\"{startExe}\" /wait /Box:{Quote(SanitizeBoxName(account))} {inner}";
+    }
+
+    public static string NormalizeRoomUrl(string roomUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomUrl);
+        var trimmed = roomUrl.Trim();
+        if (!trimmed.StartsWith("camfrog:", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Room URL must use the camfrog: scheme (copy the room link from the client room directory).");
+        if (trimmed.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
+            throw new InvalidOperationException("Room URL must not contain whitespace or control characters.");
+        return trimmed;
+    }
+
+    public static string SanitizeBoxName(CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var base_name = new string(account.Username.Where(char.IsLetterOrDigit).ToArray());
+        if (base_name.Length > 32)
+            base_name = base_name.Substring(0, 32);
+        if (string.IsNullOrEmpty(base_name))
+            base_name = "account" + account.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return base_name;
+    }
+
+    public static string? FindSandboxieStart()
+    {
+        string[] candidates =
+        [
+            @"C:\Program Files\Sandboxie-Plus\Start.exe",
+            @"C:\Program Files (x86)\Sandboxie\Start.exe",
+        ];
+        foreach (var candidate in candidates)
+        {
+            try { if (File.Exists(candidate)) return candidate; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return null;
     }
 
     public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)

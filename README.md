@@ -304,4 +304,12 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-51 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+58 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+
+## V15 sandbox multi-instance + room auto-join (experimental)
+
+The Camfrog client enforces single-instance per Windows session (verified: a second process with redirected `%APPDATA%` still exits; `CreateMutexW` in the binary). Environment-variable sandboxing alone does not work.
+
+- **Sandboxie path (recommended):** install Sandboxie-Plus, enable it in Settings (auto-detects `Start.exe` or set the path). Each account launches as `Start.exe /wait /Box:<sanitized-username> <client> <args>`, giving each identity its own object namespace so instances run side by side. `/wait` keeps the tracked PID valid for the whole session; PID/start-time/exe identity checks apply to `Start.exe`.
+- **Auto-join:** set a per-account Room URL (Add/Edit dialog). Only the `camfrog:` scheme is accepted (copy the room link from the client's room directory). Start appends `--url="<link>"` — the switch the client's own protocol registration uses. The details panel previews the full launch command including the sandbox wrapper.
+- Without Sandboxie, starting a second account while one client runs will still hand off and exit; the manager marks it Stopped with the reason instead of tracking a dead PID.

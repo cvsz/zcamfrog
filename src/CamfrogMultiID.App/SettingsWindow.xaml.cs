@@ -15,6 +15,10 @@ public partial class SettingsWindow : Window
         var settings = App.Settings.Load();
         Exe.Text = settings.ClientExecutable;
         Args.Text = settings.ClientArgumentsTemplate;
+        SandboxBox.IsChecked = settings.UseSandboxie;
+        SandboxExe.Text = settings.SandboxieStartExe;
+        if (settings.UseSandboxie && string.IsNullOrWhiteSpace(settings.SandboxieStartExe) && ProcessSessionService.FindSandboxieStart() is null)
+            ExeStatus.Text = "Sandboxie Start.exe was not auto-detected. Install Sandboxie-Plus or set its path below.";
         DataDirText.Text = $"Data: {App.Paths.Root}";
         UpdateExeStatus();
         Exe.TextChanged += (_, _) => UpdateExeStatus();
@@ -50,6 +54,12 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void BrowseSandbox_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Start.exe|Start.exe|Executable (*.exe)|*.exe", CheckFileExists = true };
+        if (dialog.ShowDialog(this) == true) SandboxExe.Text = dialog.FileName;
+    }
+
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -69,10 +79,21 @@ public partial class SettingsWindow : Window
     {
         var executable = Exe.Text.Trim();
         var template = Args.Text.Trim();
+        var useSandboxie = SandboxBox.IsChecked == true;
+        var sandboxExe = SandboxExe.Text.Trim();
         if (!string.IsNullOrWhiteSpace(executable) && !File.Exists(executable))
         {
             MessageBox.Show("The selected executable does not exist.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
+        }
+        if (useSandboxie)
+        {
+            var resolved = string.IsNullOrWhiteSpace(sandboxExe) ? ProcessSessionService.FindSandboxieStart() : sandboxExe;
+            if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
+            {
+                MessageBox.Show("Sandboxie is enabled but Start.exe was not found. Install Sandboxie-Plus or set its path.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
         }
         var warnings = ProcessSessionService.ValidateArgumentsTemplate(template);
         if (warnings.Count > 0)
@@ -87,7 +108,7 @@ public partial class SettingsWindow : Window
         }
         try
         {
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template });
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe });
             App.Db.Log("INFO", "Settings saved.");
             DialogResult = true;
         }

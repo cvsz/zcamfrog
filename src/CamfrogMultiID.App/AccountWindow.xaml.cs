@@ -18,6 +18,7 @@ public partial class AccountWindow : Window
         Title = $"Edit Account — {existing.DisplayName}";
         DisplayNameTextBox.Text = existing.DisplayName;
         UsernameTextBox.Text = existing.Username;
+        RoomUrlTextBox.Text = existing.RoomUrl;
         EnabledCheckBox.IsChecked = existing.Enabled;
         PasswordLabel.Text = "New password (leave blank to keep current)";
         PasswordHint.Text = "Leave blank to keep the stored DPAPI password. Enter a value to replace it.";
@@ -66,6 +67,20 @@ public partial class AccountWindow : Window
         }
 
         var enabled = EnabledCheckBox.IsChecked == true;
+        var roomUrl = RoomUrlTextBox.Text.Trim();
+        if (!string.IsNullOrEmpty(roomUrl))
+        {
+            try
+            {
+                roomUrl = CamfrogMultiID.Infrastructure.ProcessSessionService.NormalizeRoomUrl(roomUrl);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Invalid room URL.\n\n{ex.Message}", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                RoomUrlTextBox.Focus();
+                return;
+            }
+        }
 
         try
         {
@@ -86,7 +101,8 @@ public partial class AccountWindow : Window
                     Username = username,
                     PasswordSecretName = secret,
                     ProfileDirectory = profile,
-                    Enabled = enabled
+                    Enabled = enabled,
+                    RoomUrl = roomUrl
                 };
 
                 try
@@ -120,6 +136,7 @@ public partial class AccountWindow : Window
                 }
 
                 App.Db.UpdateDetails(existing.Id, displayName, username, enabled);
+                App.Db.SetRoomUrl(existing.Id, roomUrl);
                 App.Db.Log("INFO", $"Updated account '{displayName}' (id {existing.Id}).");
                 DialogResult = true;
             }

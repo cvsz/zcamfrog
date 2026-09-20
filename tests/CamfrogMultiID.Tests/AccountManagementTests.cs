@@ -141,6 +141,100 @@ public sealed class AccountManagementTests : IDisposable
         Assert.NotEmpty(unclosed);
     }
 
+    [Fact]
+    public void NormalizeRoomUrl_AcceptsCamfrogScheme()
+    {
+        Assert.Equal("camfrog://room/Test", ProcessSessionService.NormalizeRoomUrl("  camfrog://room/Test  "));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.NormalizeRoomUrl("   "));
+        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("https://example.com/room"));
+        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://room/a b"));
+    }
+
+    [Fact]
+    public void SanitizeBoxName_KeepsAlphanumerics()
+    {
+        var acc = new CamfrogAccount { Id = 7, Username = "User-1_2!" };
+        Assert.Equal("User12", ProcessSessionService.SanitizeBoxName(acc));
+        var empty = new CamfrogAccount { Id = 7, Username = "---" };
+        Assert.Equal("account7", ProcessSessionService.SanitizeBoxName(empty));
+    }
+
+    [Fact]
+    public void SetRoomUrl_Persists()
+    {
+        var id = _db.Add(NewAccount("roomuser"));
+        _db.SetRoomUrl(id, "camfrog://room/Test");
+        Assert.Equal("camfrog://room/Test", _db.GetById(id)!.RoomUrl);
+        Assert.Throws<InvalidOperationException>(() => _db.SetRoomUrl(id + 9999, "camfrog://room/X"));
+    }
+
+    [Fact]
+    public void Add_PersistsRoomUrl()
+    {
+        var acc = NewAccount("roomadd");
+        acc.RoomUrl = "camfrog://room/Add";
+        var id = _db.Add(acc);
+        Assert.Equal("camfrog://room/Add", _db.GetById(id)!.RoomUrl);
+    }
+
+    [Fact]
+    public void PreviewLaunch_IncludesRoomAndSandbox()
+    {
+        var acc = new CamfrogAccount { Id = 1, Username = "u1", ProfileDirectory = @"C:\p\1", RoomUrl = "camfrog://room/R" };
+        var plain = ProcessSessionService.PreviewLaunch(new AppSettings { ClientExecutable = @"C:\c.exe" }, acc);
+        Assert.Contains("--url=", plain);
+        Assert.Contains("camfrog://room/R", plain);
+        var boxed = ProcessSessionService.PreviewLaunch(new AppSettings { ClientExecutable = @"C:\c.exe", UseSandboxie = true, SandboxieStartExe = @"C:\sb\Start.exe" }, acc);
+        Assert.Contains("/wait", boxed);
+        Assert.Contains("/Box:", boxed);
+        Assert.Contains("Start.exe", boxed);
+    }
+
+    [Fact]
+    public void Migration_OldDatabaseWithoutRoomUrl_StillReads()
+    {
+        var dbPath = Path.Combine(_paths.Root, "migtest.db");
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    display_name TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    secret_name TEXT NOT NULL UNIQUE,
+                    profile_directory TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'Stopped',
+                    process_id INTEGER,
+                    started_utc TEXT,
+                    process_executable_path TEXT NOT NULL DEFAULT '',
+                    last_error TEXT NOT NULL DEFAULT ''
+                );
+                INSERT INTO accounts (display_name,username,secret_name,profile_directory,enabled)
+                VALUES('Old','olduser','s1','p1',1);
+                """;
+            command.ExecuteNonQuery();
+        }
+        // Point a DatabaseService at this legacy file via a dedicated AppPaths root.
+        var legacyRoot = Path.Combine(Path.GetTempPath(), "zcamfrog-tests-legacy-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(legacyRoot);
+        try
+        {
+            File.Copy(dbPath, Path.Combine(legacyRoot, "camfrog.db"));
+            var legacyDb = new DatabaseService(new AppPaths(legacyRoot));
+            legacyDb.Initialize();
+            var acc = legacyDb.GetAccounts().Single();
+            Assert.Equal("olduser", acc.Username);
+            Assert.Equal(string.Empty, acc.RoomUrl);
+        }
+        finally
+        {
+            try { Directory.Delete(legacyRoot, true); } catch { }
+        }
+    }
+
     private CamfrogAccount NewAccount(string username)
     {
         return new CamfrogAccount

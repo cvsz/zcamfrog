@@ -144,7 +144,7 @@ public partial class MainWindow : Window
         }
 
         var settings = App.Settings.Load();
-        var preview = ProcessSessionService.PreviewCommandLine(settings.ClientExecutable, settings.ClientArgumentsTemplate, account);
+        var preview = ProcessSessionService.PreviewLaunch(settings, account);
         var secretExists = App.Credentials.Exists(account.PasswordSecretName);
         var profileExists = Directory.Exists(account.ProfileDirectory);
         var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
@@ -153,6 +153,7 @@ public partial class MainWindow : Window
             $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}\n" +
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
             $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
+            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—" : account.RoomUrl)}\n" +
             $"Launch: {preview}";
     }
 

@@ -13,6 +13,7 @@ public sealed class CamfrogAccount
     public DateTime? StartedAtUtc { get; set; }
     public string ProcessExecutablePath { get; set; } = string.Empty;
     public string LastError { get; set; } = string.Empty;
+    public string RoomUrl { get; set; } = string.Empty;
 }
 
 public sealed class AppSettings
@@ -20,4 +21,6 @@ public sealed class AppSettings
     public string ClientExecutable { get; set; } = string.Empty;
     public string ClientArgumentsTemplate { get; set; } = string.Empty;
     public string DataDirectory { get; set; } = string.Empty;
+    public bool UseSandboxie { get; set; }
+    public string SandboxieStartExe { get; set; } = string.Empty;
 }
