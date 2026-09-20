@@ -24,6 +24,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: csharp, actions
+          config-file: ./.github/codeql-config.yml
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
