@@ -18,8 +18,10 @@
 
 ## Next improvements
 
-- [ ] Add account editing with credential rotation and profile reset controls.
-- [ ] Add richer process diagnostics and per-account lifecycle history.
-- [ ] Add signed release artifacts and provenance attestations.
-- [ ] Add UI smoke tests on a Windows runner where interactive WPF execution is supported.
+- [ ] Account editing with credential rotation and profile reset controls.
+- [ ] Richer process diagnostics and per-account lifecycle history.
+- [ ] Signed release artifacts and provenance attestations.
+- [ ] UI smoke tests on a Windows runner where interactive WPF execution is supported.
 - [ ] Validate profile isolation against each supported Camfrog client version.
+- [ ] Add automated validation for the Ubuntu MinGW/Wine/vcpkg helper toolchain.
+- [ ] Add release artifact checksums and documented verification instructions.
