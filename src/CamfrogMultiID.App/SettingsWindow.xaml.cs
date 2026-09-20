@@ -17,6 +17,8 @@ public partial class SettingsWindow : Window
         Args.Text = settings.ClientArgumentsTemplate;
         SandboxBox.IsChecked = settings.UseSandboxie;
         SandboxExe.Text = settings.SandboxieStartExe;
+        UpdateSandboxStatus();
+        SandboxExe.TextChanged += (_, _) => UpdateSandboxStatus();
         if (settings.UseSandboxie && string.IsNullOrWhiteSpace(settings.SandboxieStartExe) && ProcessSessionService.FindSandboxieStart() is null)
             ExeStatus.Text = "Sandboxie Start.exe was not auto-detected. Install Sandboxie-Plus or set its path below.";
         DataDirText.Text = $"Data: {App.Paths.Root}";
@@ -57,7 +59,68 @@ public partial class SettingsWindow : Window
     private void BrowseSandbox_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Filter = "Start.exe|Start.exe|Executable (*.exe)|*.exe", CheckFileExists = true };
-        if (dialog.ShowDialog(this) == true) SandboxExe.Text = dialog.FileName;
+        if (dialog.ShowDialog(this) == true)
+        {
+            SandboxExe.Text = dialog.FileName;
+            UpdateSandboxStatus();
+        }
+    }
+
+    private void UpdateSandboxStatus()
+    {
+        var configured = SandboxExe.Text.Trim();
+        var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
+        SandboxStatus.Text = string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved)
+            ? "Sandboxie: not found. Use the download button below, then Browse to Start.exe."
+            : $"Sandboxie: found at {resolved}. Boxes live under {ProcessSessionService.GetBoxesRoot()}.";
+    }
+
+    private void DownloadSandboxie_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = ProcessSessionService.SandboxieReleasesUrl, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to open the download page.\n\n{ex.Message}", "Download", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void CreateBoxes_Click(object sender, RoutedEventArgs e)
+    {
+        var configured = SandboxExe.Text.Trim();
+        var startExe = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
+        if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+        {
+            MessageBox.Show("Sandboxie Start.exe was not found. Install Sandboxie-Plus first.", "Create Boxes", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var ok = 0;
+        var failures = new List<string>();
+        foreach (var account in App.Db.GetAccounts())
+        {
+            try
+            {
+                ProcessSessionService.CreateBox(startExe, ProcessSessionService.SanitizeBoxName(account));
+                ok++;
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{account.DisplayName}: {ex.Message}");
+            }
+        }
+
+        App.Db.Log("INFO", $"Created {ok} Sandboxie box(es).");
+        MessageBox.Show(
+            failures.Count == 0
+                ? $"Created {ok} Sandboxie box(es). Accounts can now run simultaneously."
+                : $"Created {ok} box(es). Failures:\n\n{string.Join("\n", failures)}",
+            "Create Boxes",
+            MessageBoxButton.OK,
+            failures.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        UpdateSandboxStatus();
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)

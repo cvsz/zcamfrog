@@ -154,6 +154,9 @@ public partial class MainWindow : Window
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
             $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
             $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—" : account.RoomUrl)}\n" +
+            (settings.UseSandboxie
+                ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created — use Settings]")}\n"
+                : string.Empty) +
             $"Launch: {preview}";
     }
 

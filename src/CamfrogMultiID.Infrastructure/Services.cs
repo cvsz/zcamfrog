@@ -778,6 +778,52 @@ public sealed class ProcessSessionService
         return null;
     }
 
+    public const string SandboxieReleasesUrl = "https://github.com/sandboxie-plus/Sandboxie/releases";
+
+    public static string GetBoxesRoot()
+    {
+        // Overridable for tests; default matches Sandboxie-Plus per-user layout.
+        var overrideRoot = Environment.GetEnvironmentVariable("CAMFROGMULTIID_SANDBOX_ROOT");
+        if (!string.IsNullOrWhiteSpace(overrideRoot))
+            return overrideRoot;
+        return Path.Combine(
+            Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.System)) ?? "C:\\",
+            "Sandbox",
+            Environment.UserName);
+    }
+
+    public static bool BoxExists(string boxName)
+    {
+        if (string.IsNullOrWhiteSpace(boxName))
+            return false;
+        try { return Directory.Exists(Path.Combine(GetBoxesRoot(), boxName)); }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
+    public static string BuildCreateBoxArguments(string boxName) =>
+        $"/Box:{Quote(boxName)} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+
+    public static void CreateBox(string startExe, string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        if (!File.Exists(startExe))
+            throw new FileNotFoundException("Sandboxie Start.exe was not found.", startExe);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = startExe,
+            Arguments = BuildCreateBoxArguments(boxName),
+            UseShellExecute = false,
+            CreateNoWindow = true
+        }) ?? throw new InvalidOperationException("Could not start Sandboxie Start.exe.");
+        // cmd /c exit terminates immediately; the box persists afterwards.
+        if (!process.WaitForExit(30000))
+            throw new TimeoutException($"Timed out creating Sandboxie box '{boxName}'.");
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}.");
+    }
+
     public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)
     {
         var warnings = new List<string>();

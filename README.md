@@ -304,7 +304,13 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-58 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+60 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).
+
+## V16 Sandboxie onboarding + bundle
+
+- Settings shows Sandboxie detection status and boxes root, downloads Sandboxie-Plus from GitHub releases, and creates one box per account (`Start.exe /Box:<name> cmd /c exit`).
+- Details panel shows box state (`[created]` / `[not created — use Settings]`) when sandboxing is enabled.
+- `bundle-setup.ps1` (launcher `bundle-setup.cmd`) downloads Sandboxie-Plus latest + the manager release zip, verifies SHA256, extracts, and prints the manual Camfrog client step. We do not ship our own sandbox driver: kernel-level virtualization is Sandboxie-Plus's job (free, GPL-3.0, used as an external tool).
 
 ## V15 sandbox multi-instance + room auto-join (experimental)
 

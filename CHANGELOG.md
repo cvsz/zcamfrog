@@ -13,6 +13,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - Startup crash fix: guard `MainWindow` event handlers during `InitializeComponent` (`_initialized`), corrupt `started_utc` now parses to null instead of throwing, refresh loop catches and logs instead of killing the UI
 - Sandbox multi-instance (experimental): optional Sandboxie-Plus launch per account (`Start.exe /wait /Box:<user>`, box name sanitized); env-redirection alone proven insufficient (client mutex, PID 7364 test)
 - Auto-join rooms: per-account `RoomUrl` (`camfrog:` scheme validated) appended as `--url=` (registry-verified client switch); launch preview shows full sandboxed command
+- Sandboxie onboarding: status + one-click download + Create-Boxes-For-All in Settings, box state in details panel, `SandboxieService` (boxes root, exists, create), `bundle-setup.ps1/.cmd` (Sandboxie-Plus + manager bundle with checksum)
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build

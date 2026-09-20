@@ -178,6 +178,34 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void BoxExists_UsesOverrideRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "zcamfrog-boxtest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "SomeBox"));
+        var previous = Environment.GetEnvironmentVariable("CAMFROGMULTIID_SANDBOX_ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("CAMFROGMULTIID_SANDBOX_ROOT", root);
+            Assert.True(ProcessSessionService.BoxExists("SomeBox"));
+            Assert.False(ProcessSessionService.BoxExists("Missing"));
+            Assert.False(ProcessSessionService.BoxExists(""));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CAMFROGMULTIID_SANDBOX_ROOT", previous);
+            try { Directory.Delete(root, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void BuildCreateBoxArguments_QuotesBox()
+    {
+        var args = ProcessSessionService.BuildCreateBoxArguments("My Box");
+        Assert.Contains("/Box:", args);
+        Assert.Contains("cmd.exe", args);
+    }
+
+    [Fact]
     public void PreviewLaunch_IncludesRoomAndSandbox()
     {
         var acc = new CamfrogAccount { Id = 1, Username = "u1", ProfileDirectory = @"C:\p\1", RoomUrl = "camfrog://room/R" };
