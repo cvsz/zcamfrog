@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate required template files
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            README.md
+            ABOUT.md
+            CONTRIBUTING.md
+            SECURITY.md
+            CODE_OF_CONDUCT.md
+            CHANGELOG.md
+            ROADMAP.md
+            IMPLEMENTATION-CHECKLIST.md
+            .github/PULL_REQUEST_TEMPLATE.md
+            .github/dependabot.yml
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Missing required file: $path"; exit 1; }
+          done
+
+      - name: Check for common secret file names
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env|id_rsa|id_ed25519|.*\.pem|.*\.key)$' | grep -v '^\.env\.example$'; then
+            echo 'Potential secret-bearing file is tracked.'
+            exit 1
+          fi
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          ruby -e 'require "yaml"; Dir.glob(".github/**/*.{yml,yaml}").each { |f| YAML.load_file(f); puts "ok #{f}" }'

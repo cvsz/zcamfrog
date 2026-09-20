@@ -1,0 +1,5 @@
+# Replace or extend ownership rules for generated repositories.
+* @cvsz
+
+/.github/ @cvsz
+/SECURITY.md @cvsz

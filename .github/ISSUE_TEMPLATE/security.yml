@@ -1,0 +1,16 @@
+name: Security report
+description: Guidance for reporting a potential vulnerability
+title: "[Security]: use private reporting"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not disclose vulnerability details in a public issue.**
+        Follow SECURITY.md and use GitHub private vulnerability reporting when enabled.
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I will use the private reporting channel described in SECURITY.md.
+          required: true
