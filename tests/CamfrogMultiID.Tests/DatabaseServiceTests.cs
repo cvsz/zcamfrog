@@ -123,6 +123,23 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Empty(_db.GetAccounts());
     }
 
+    [Fact]
+    public void GetAccounts_CorruptStartedUtc_ReturnsNullInsteadOfThrowing()
+    {
+        var id = _db.Add(NewAccount("corruptdate"));
+        // Corrupt the started_utc value directly, bypassing UpdateRuntime validation.
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={System.IO.Path.Combine(_paths.Root, "camfrog.db")}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE accounts SET status='Running', process_id=1234, started_utc='not-a-date' WHERE id=$id;";
+        command.Parameters.AddWithValue("$id", id);
+        command.ExecuteNonQuery();
+
+        var acc = _db.GetAccounts().Single(a => a.Id == id);
+        Assert.Null(acc.StartedAtUtc);
+        Assert.Equal(1234, acc.ProcessId);
+    }
+
     private CamfrogAccount NewAccount(string username, string? secret = null)
     {
         var s = secret ?? "secret_" + Guid.NewGuid().ToString("N");

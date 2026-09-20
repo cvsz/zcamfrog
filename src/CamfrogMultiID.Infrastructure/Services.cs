@@ -127,7 +127,7 @@ public sealed class DatabaseService
                     Status = reader.GetString(6),
                     ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     StartedAtUtc = reader.IsDBNull(8) ? null :
-                        DateTime.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
+                        (DateTime.TryParse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedStart) ? parsedStart : null),
                     ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
                     LastError = reader.GetString(10)
                 });

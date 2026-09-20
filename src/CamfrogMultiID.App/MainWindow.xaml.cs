@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _refreshing;
+    private bool _initialized;
     private string _logLevelFilter = "All";
 
     public MainWindow()
@@ -21,6 +22,10 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closed += (_, _) => _timer.Stop();
         _timer.Tick += (_, _) => RefreshRuntimeState();
+        // SelectionChanged/TextChanged fire during InitializeComponent (XAML default
+        // selection); ignore them until construction is complete. See startup-error.log
+        // NullReferenceException at UpdateLogBox via LogLevelBox_SelectionChanged.
+        _initialized = true;
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -29,10 +34,15 @@ public partial class MainWindow : Window
         _timer.Start();
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshRuntimeState();
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_initialized) return;
+        RefreshRuntimeState();
+    }
 
     private void LogLevelBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_initialized) return;
         if (LogLevelBox.SelectedItem is ComboBoxItem item && item.Content is string level)
         {
             _logLevelFilter = level;
@@ -40,7 +50,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateDetails();
+    private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized) return;
+        UpdateDetails();
+    }
 
     private void AccountsGrid_DoubleClick(object sender, MouseButtonEventArgs e) => EditSelected();
 
@@ -65,7 +79,7 @@ public partial class MainWindow : Window
 
     private void RefreshRuntimeState()
     {
-        if (_refreshing) return;
+        if (!_initialized || _refreshing) return;
         _refreshing = true;
 
         try
@@ -104,6 +118,14 @@ public partial class MainWindow : Window
             UpdateDetails(view);
             UpdateStatusBar(all);
             UpdateLogBox();
+        }
+        catch (Exception ex)
+        {
+            // A corrupt database, locked file, or unexpected OS failure must never
+            // kill the UI timer loop. Keep the previous grid state and record the
+            // failure for diagnosis.
+            try { App.Db?.Log("ERROR", $"Refresh failed: {ex.Message}"); } catch { }
+            try { StatusCounts.Text = $"Refresh failed: {ex.Message}"; } catch { }
         }
         finally
         {

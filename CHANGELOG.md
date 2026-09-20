@@ -9,7 +9,8 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - Settings: exe existence status, template warning validation, data folder display + open-folder
 - Backend: `GetById`, `UpdateDetails`, `SetEnabled`, `Delete`, `ClearError`, `UsernameExistsExcept`, `CredentialService.Exists/Delete`, `PreviewCommandLine/PreviewArguments/ValidateArgumentsTemplate`
 - Dependencies (verified `net8.0-windows`, 51/51 tests): `Microsoft.Data.Sqlite` 8.0.30→10.0.12, `ProtectedData` 8.0.0→10.0.12, `Test.Sdk` 17.8.0→18.10.1, `coverlet` 6.0.0→10.0.1, `xunit` 2.5.3→2.9.3, `runner.visualstudio` 2.5.3→4.0.0; Actions `checkout` v4→v7, `setup-dotnet` v4→v6, `upload-artifact` v4→v7
-- Tests: `AccountManagementTests` (12 tests) — total 51 tests
+- Tests: `AccountManagementTests` (12 tests) — total 52 tests
+- Startup crash fix: guard `MainWindow` event handlers during `InitializeComponent` (`_initialized`), corrupt `started_utc` now parses to null instead of throwing, refresh loop catches and logs instead of killing the UI
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build
