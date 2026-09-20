@@ -10,7 +10,13 @@ Include affected versions or commits, reproduction details, impact, prerequisite
 
 ## Supported versions
 
-Each generated project should replace this section with its real support policy before its first production release.
+| Version | Supported |
+|---------|-----------|
+| `main` (latest) | Yes |
+| `v1.x` | Yes — security fixes backported for 6 months after next minor |
+| `< v1.0` | No |
+
+Security fixes are released as patch versions and via GitHub Security Advisories.
 
 ## Security expectations
 
@@ -26,4 +32,4 @@ Each generated project should replace this section with its real support policy 
 
 ## Incident handling
 
-Projects generated from this template should document containment, remediation, validation, disclosure, and rollback procedures appropriate to their risk profile.
+For Camfrog Multi-ID Manager: contain by revoking/re-entering DPAPI secrets, patch via new release, validate with `dotnet test` and manual smoke on clean Windows, disclose via GitHub Advisory if user data at risk, rollback by re-tagging last good `vX.Y.Z`.

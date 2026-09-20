@@ -9,17 +9,23 @@ namespace CamfrogMultiID.Infrastructure;
 
 public sealed class AppPaths
 {
-    public string Root { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "CamfrogMultiID");
+    public string Root { get; }
     public string Database => Path.Combine(Root, "camfrog.db");
     public string Profiles => Path.Combine(Root, "profiles");
     public string Secrets => Path.Combine(Root, "secrets");
     public string Logs => Path.Combine(Root, "logs");
     public string Settings => Path.Combine(Root, "settings.json");
 
-    public AppPaths()
+    public AppPaths() : this(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CamfrogMultiID"))
     {
+    }
+
+    public AppPaths(string root)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        Root = Path.GetFullPath(root);
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(Profiles);
         Directory.CreateDirectory(Secrets);

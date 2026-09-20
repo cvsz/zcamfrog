@@ -9,7 +9,7 @@ Before requesting help, review README.md, docs/, existing issues, and release no
 Do **not** report vulnerabilities, credentials, private data, or exploit details in public issues or Discussions. Follow SECURITY.md.
 
 ## Support expectations
-This template does not promise a service-level agreement. Projects generated from it should replace this section with their actual support channels and response expectations.
+Camfrog Multi-ID Manager is community-maintained under `cvsz`. Issues are triaged best-effort; no formal SLA. For critical security issues use private vulnerability reporting.
 
 ## Include
 When reporting a problem, include the version or commit, environment, reproduction steps, expected and actual behavior, and sanitized logs. Remove secrets and personal data.

@@ -157,6 +157,7 @@ Expected projects:
 CamfrogMultiID.Core
 CamfrogMultiID.Infrastructure
 CamfrogMultiID.App
+CamfrogMultiID.Tests
 ```
 
 ### Clean rebuild
@@ -255,6 +256,16 @@ Do not add `NoWarn` or disable analyzers to work around compiler/analyzer failur
 - `IsTrackedProcessAlive` remains an instance method so existing `App.Sessions.IsTrackedProcessAlive(...)` calls are valid.
 - `StartAccount` and `StopAccount` are static because they use only application-wide services and their parameters, satisfying CA1822 without changing the public process-service API.
 
+
+## V13 test and solution regeneration
+
+- Regenerated `CamfrogMultiID.sln` via `dotnet new sln` to fix hidden solution-configuration corruption that caused `dotnet restore` to skip `Infrastructure`/`App` (`BuildProjectInSolution=False`) and required a manual `win-x64` workaround. The new sln correctly maps `Debug|Any CPU` and `Release|Any CPU` for all projects.
+- Added `tests/CamfrogMultiID.Tests` (xUnit, `net8.0-windows`, 39 tests) covering database, DPAPI, settings, process identity, quoting, and concurrency.
+- CI now runs on `windows-latest` with `setup-dotnet`, `restore` (solution + `win-x64`), `build` Debug/Release, `test`, `publish` single-file, and artifact upload.
+- CodeQL now scans `csharp` (windows) and `actions` (ubuntu) with `security-extended`.
+- `.gitignore` now excludes `bin/`, `obj/`, `.vs/`, `TestResults/`, `publish/`.
+- `Makefile` and `Dockerfile` updated to reflect actual Windows WPF lifecycle.
+- Docs `docs/architecture.md`, `docs/development.md`, `docs/release.md`, `docs/template-inventory.md` synchronized.
 
 ## PowerShell execution policy
 

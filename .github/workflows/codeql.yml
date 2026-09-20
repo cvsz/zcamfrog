@@ -11,19 +11,55 @@ on:
 permissions:
   contents: read
   security-events: write
+  actions: read
 
 jobs:
   analyze:
-    name: Analyze GitHub Actions
-    runs-on: ubuntu-latest
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            os: ubuntu-latest
+            build-mode: none
+          - language: csharp
+            os: windows-latest
+            build-mode: manual
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 (csharp)
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: actions
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql-config.yml
+          queries: +security-and-quality
+
+      - name: Autobuild (actions)
+        if: matrix.build-mode == 'none'
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Build C# (manual)
+        if: matrix.language == 'csharp'
+        shell: pwsh
+        run: |
+          dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64
+          dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
+          if ($LASTEXITCODE -ne 0) {
+            dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore --verbosity minimal
+            if ($LASTEXITCODE -ne 0) { throw "Build failed for CodeQL" }
+          }
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

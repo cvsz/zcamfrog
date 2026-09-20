@@ -1,35 +1,44 @@
-# Repository Template Inventory
+# Project Inventory — Camfrog Multi-ID Manager
 
-This repository provides a secure, reusable baseline for new GitHub projects.
+This document replaces the generic template inventory and reflects the current repository state.
 
-## Governance and community
-- AGENTS.md
-- README.md
-- ABOUT.md
-- CONTRIBUTING.md
-- CODE_OF_CONDUCT.md
-- GOVERNANCE.md
-- SECURITY.md
-- .github/SUPPORT.md
-- issue forms and pull request template
-- CODEOWNERS
+## Solution
 
-## Automation and security
-- baseline CI
-- CodeQL and CodeQL configuration
-- dependency review
-- Dependabot
-- release notes configuration
-- least-privilege workflow guidance
+- `CamfrogMultiID.sln` (projects: Core, Infrastructure, App, Tests)
 
-## Engineering lifecycle
-- CHANGELOG.md
-- ROADMAP.md
-- IMPLEMENTATION-CHECKLIST.md
-- architecture, development, release, and ADR documentation
-- Dockerfile, Makefile, environment example, EditorConfig, Git attributes, and Git ignore baseline
+## Source
 
-## Adoption checklist
-After creating a repository from this template, replace project placeholders, review CODEOWNERS and security contacts, select the actual language/runtime CI matrix, configure required branch/ruleset checks, configure only required secrets/environments, and remove optional files that the project intentionally does not use.
+- `src/CamfrogMultiID.Core/` — domain models (`CamfrogAccount`, `AppSettings`)
+- `src/CamfrogMultiID.Infrastructure/` — `AppPaths`, `DatabaseService`, `CredentialService`, `SettingsService`, `ProcessSessionService` (SQLite + DPAPI + Process)
+- `src/CamfrogMultiID.App/` — WPF (`App.xaml`, `MainWindow`, `AccountWindow`, `SettingsWindow`, `app.manifest`)
+- `tests/CamfrogMultiID.Tests/` — xUnit coverage for all layers
 
-Never copy production credentials into a generated repository.
+## Build and release
+
+- `build-release.ps1` / `build-release.cmd` — deterministic restore → build → publish `win-x64` self-contained
+- `Directory.Build.props`, `.editorconfig`, `Makefile` (dotnet targets)
+
+## CI/CD
+
+- `.github/workflows/ci.yml` — windows-latest .NET 8 build matrix (restore, Debug, Release, test, publish) + ubuntu baseline
+- `.github/workflows/codeql.yml` — CodeQL for `csharp` and `actions` (security-extended)
+- `.github/workflows/dependency-review.yml` — PR dependency review
+- `.github/dependabot.yml` — `github-actions` + `nuget` + `docker`
+- `.github/codeql-config.yml` — security-extended queries
+
+## Governance and docs
+
+- `README.md` — production build baseline, security boundary, publish procedure
+- `ABOUT.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `SECURITY.md`
+- `CHANGELOG.md`, `ROADMAP.md`, `IMPLEMENTATION-CHECKLIST.md`
+- `docs/architecture.md`, `docs/development.md`, `docs/release.md`, `docs/adr/`
+
+## Configuration
+
+- `.gitignore` — .NET artifacts (`bin/`, `obj/`, `.vs/`, `TestResults/`, `publish/`) + secrets
+- `.gitattributes` — `text=auto eol=lf`, binaries
+- `Dockerfile` — documents Windows-only (not supported in Linux container)
+
+## Scripts
+
+- `run-diagnostic.cmd` — verifies publish and process liveness
