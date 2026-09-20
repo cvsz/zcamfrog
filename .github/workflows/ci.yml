@@ -13,13 +13,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  repository-baseline:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .\CamfrogMultiID.sln
+
+      - name: Build Release
+        run: dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test .\tests\CamfrogMultiID.Tests\CamfrogMultiID.Tests.csproj -c Release --no-restore --verbosity normal
+
+      - name: Verify production publish
+        shell: pwsh
+        run: |
+          .\build-release.ps1
+          if (-not (Test-Path '.\src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe')) {
+            throw 'Production executable was not published.'
+          }
+
+  repository-security:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      - name: Validate required template files
+      - name: Validate repository files
         shell: bash
         run: |
           set -euo pipefail
@@ -45,6 +73,15 @@ jobs:
           set -euo pipefail
           if git ls-files | grep -E '(^|/)(\.env|id_rsa|id_ed25519|.*\.pem|.*\.key)$' | grep -v '^\.env\.example$'; then
             echo 'Potential secret-bearing file is tracked.'
+            exit 1
+          fi
+
+      - name: Scan for unfinished implementation markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md'; then
+            echo 'Unfinished/template implementation marker found.'
             exit 1
           fi
 
