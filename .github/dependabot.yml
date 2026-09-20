@@ -6,7 +6,7 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
 
-  - package-ecosystem: docker
+  - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
