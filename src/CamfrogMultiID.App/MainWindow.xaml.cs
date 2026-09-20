@@ -1,8 +1,8 @@
-using CamfrogMultiID.Infrastructure;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using CamfrogMultiID.Core;
+using CamfrogMultiID.Infrastructure;
 
 namespace CamfrogMultiID.App;
 
@@ -39,12 +39,25 @@ public partial class MainWindow : Window
 
                 if (!ProcessSessionService.IsTrackedProcessAlive(account, out var reason))
                 {
-                    App.Db.UpdateRuntime(account.Id, "Stopped", null, null, reason ?? "Process exited.");
-                    App.Db.Log("INFO", $"{account.DisplayName}: {reason ?? "Process exited."}");
+                    if (IsDefinitivelyStopped(reason))
+                    {
+                        App.Db.UpdateRuntime(account.Id, "Stopped", null, null, reason ?? "Process exited.");
+                        App.Db.Log("INFO", $"{account.DisplayName}: {reason ?? "Process exited."}");
+                    }
+                    else
+                    {
+                        App.Db.UpdateRuntime(
+                            account.Id,
+                            "Error",
+                            account.ProcessId,
+                            account.StartedAtUtc,
+                            reason ?? "Unable to verify process identity.",
+                            account.ProcessExecutablePath);
+                        App.Db.Log("WARN", $"{account.DisplayName}: {reason ?? "Unable to verify process identity."}");
+                    }
                 }
             }
 
-            AccountsGrid.ItemsSource = null;
             AccountsGrid.ItemsSource = App.Db.GetAccounts();
 
             try
@@ -61,6 +74,13 @@ public partial class MainWindow : Window
             _refreshing = false;
         }
     }
+
+    private static bool IsDefinitivelyStopped(string? reason) =>
+        reason is not null &&
+        (reason.Equals("Process exited.", StringComparison.Ordinal) ||
+         reason.Equals("Process no longer exists.", StringComparison.Ordinal) ||
+         reason.Equals("PID was reused by a different process.", StringComparison.Ordinal) ||
+         reason.Equals("Process executable path does not match the tracked executable.", StringComparison.Ordinal));
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
@@ -94,6 +114,74 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+    private void RemoveSelected_Click(object sender, RoutedEventArgs e)
+    {
+        if (AccountsGrid.SelectedItem is not CamfrogAccount account)
+        {
+            MessageBox.Show("Please select an account first.", "Remove Account",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (ProcessSessionService.IsTrackedProcessAlive(account, out var reason))
+        {
+            MessageBox.Show(
+                "Stop the account before removing it.",
+                "Remove Account",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!IsDefinitivelyStopped(reason) && account.ProcessId is not null)
+        {
+            MessageBox.Show(
+                $"The manager cannot safely verify the process state. Removal is blocked.\n\n{reason}",
+                "Remove Account",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            $"Remove '{account.DisplayName}'?\n\nThis deletes its stored credential and profile directory.",
+            "Remove Account",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            App.Db.Delete(account.Id);
+            App.Credentials.Delete(account.PasswordSecretName);
+
+            try
+            {
+                if (Directory.Exists(account.ProfileDirectory))
+                    Directory.Delete(account.ProfileDirectory, true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                App.Db.Log("WARN", $"Account '{account.DisplayName}' removed but profile cleanup failed: {ex.Message}");
+            }
+
+            App.Db.Log("INFO", $"Removed account '{account.DisplayName}'.");
+            RefreshRuntimeState();
+        }
+        catch (Exception ex)
+        {
+            App.Db.Log("ERROR", $"Failed to remove account '{account.DisplayName}': {ex.Message}");
+            MessageBox.Show(
+                $"Unable to remove '{account.DisplayName}'.\n\n{ex.Message}",
+                "Remove Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
     private void StartAll_Click(object sender, RoutedEventArgs e)
     {
         var settings = App.Settings.Load();
@@ -119,17 +207,23 @@ public partial class MainWindow : Window
         {
             if (account.ProcessId is int)
             {
-                if (ProcessSessionService.IsTrackedProcessAlive(account, out _))
+                if (ProcessSessionService.IsTrackedProcessAlive(account, out var reason))
                     return;
 
-                App.Db.UpdateRuntime(account.Id, "Stopped", null, null);
+                if (!IsDefinitivelyStopped(reason))
+                {
+                    throw new InvalidOperationException(
+                        reason ?? "Unable to safely verify the existing process.");
+                }
+
+                App.Db.UpdateRuntime(account.Id, "Stopped", null, null, reason ?? string.Empty);
             }
 
             App.Sessions.Start(account, settings);
         }
         catch (Exception ex)
         {
-            App.Db.UpdateRuntime(account.Id, "Error", null, null, ex.Message);
+            App.Db.UpdateRuntime(account.Id, "Error", account.ProcessId, account.StartedAtUtc, ex.Message, account.ProcessExecutablePath);
             App.Db.Log("ERROR", $"{account.DisplayName}: {ex.Message}");
             MessageBox.Show(
                 $"Unable to start '{account.DisplayName}'.\n\n{ex.Message}",
@@ -145,7 +239,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            App.Db.UpdateRuntime(account.Id, "Error", null, null, ex.Message);
+            App.Db.UpdateRuntime(account.Id, "Error", account.ProcessId, account.StartedAtUtc, ex.Message, account.ProcessExecutablePath);
             App.Db.Log("ERROR", $"{account.DisplayName}: {ex.Message}");
             MessageBox.Show(
                 $"Unable to stop '{account.DisplayName}'.\n\n{ex.Message}",
