@@ -5,6 +5,20 @@
 *.pem
 *.key
 
+# .NET build artifacts
+bin/
+obj/
+out/
+publish/
+artifacts/
+TestResults/
+coverage/
+*.user
+*.suo
+.vs/
+*.nupkg
+*.snupkg
+
 # Dependencies
 node_modules/
 .venv/

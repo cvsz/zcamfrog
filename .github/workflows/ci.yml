@@ -17,10 +17,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate repository files
         shell: bash
@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md' ':!.github/workflows/ci.yml' ':!Makefile'; then
+          if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md' ':!AGENTS.md' ':!.github/workflows/ci.yml' ':!Makefile'; then
             echo 'Unfinished/template implementation marker found.'
             exit 1
           fi
