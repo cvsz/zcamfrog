@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to package'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .\CamfrogMultiID.sln
+
+      - name: Build
+        run: dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test .\tests\CamfrogMultiID.Tests\CamfrogMultiID.Tests.csproj -c Release --no-restore --verbosity normal
+
+      - name: Publish
+        shell: pwsh
+        run: .\build-release.ps1
+
+      - name: Package
+        shell: pwsh
+        env:
+          RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if ($env:RELEASE_REF -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Release ref must be a semantic version tag such as v1.0.0. Got: $env:RELEASE_REF"
+          }
+
+          $publish = Join-Path $PWD 'src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish'
+          $exe = Join-Path $publish 'CamfrogMultiID.exe'
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Published executable not found: $exe"
+          }
+
+          $archive = Join-Path $PWD "CamfrogMultiID-$env:RELEASE_REF-win-x64.zip"
+          Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $archive -Force
+
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $archive)" | Set-Content -Encoding utf8 -LiteralPath "$archive.sha256"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          $archive = "CamfrogMultiID-$env:RELEASE_REF-win-x64.zip"
+          $checksum = "$archive.sha256"
+
+          gh release view $env:RELEASE_REF *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_REF $archive $checksum --clobber
+          } else {
+            gh release create $env:RELEASE_REF $archive $checksum --title "Camfrog Multi-ID Manager $env:RELEASE_REF" --generate-notes
+          }
