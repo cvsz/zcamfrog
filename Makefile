@@ -1,26 +1,33 @@
 SHELL := /bin/sh
 
-.PHONY: help setup format lint test build security ci
+.PHONY: help restore build test publish format lint security ci clean
 
 help:
-	@printf '%s\n' 'Targets: setup format lint test build security ci'
+	@printf '%s\n' 'Targets: restore build test publish format lint security ci clean'
 
-setup:
-	@echo 'Replace with project bootstrap command.'
-
-format:
-	@echo 'Replace with project formatter command.'
-
-lint:
-	@echo 'Replace with project lint command.'
-
-test:
-	@echo 'Replace with project test command.'
+restore:
+	dotnet restore CamfrogMultiID.sln
 
 build:
-	@echo 'Replace with project build command.'
+	dotnet build CamfrogMultiID.sln -c Release --no-restore
+
+test:
+	dotnet test tests/CamfrogMultiID.Tests/CamfrogMultiID.Tests.csproj -c Release --no-restore --verbosity normal
+
+publish:
+	pwsh -NoProfile -File ./build-release.ps1
+
+format:
+	dotnet format CamfrogMultiID.sln --verify-no-changes --no-restore
+
+lint:
+	dotnet build CamfrogMultiID.sln -c Release --no-restore -warnaserror
 
 security:
-	@echo 'Use repository security workflows and add stack-specific scanners.'
+	@set -e; if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md'; then exit 1; fi
+	@echo 'Static security marker scan passed.'
 
-ci: lint test build security
+ci: restore build test lint security
+
+clean:
+	dotnet clean CamfrogMultiID.sln
