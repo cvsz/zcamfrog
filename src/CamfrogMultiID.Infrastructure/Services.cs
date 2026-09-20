@@ -138,6 +138,7 @@ public sealed class DatabaseService
 
     public bool UsernameExists(string username)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
         lock (_gate)
         {
             using var connection = Open();
@@ -145,6 +146,121 @@ public sealed class DatabaseService
             command.CommandText = "SELECT EXISTS(SELECT 1 FROM accounts WHERE username = $username COLLATE NOCASE)";
             command.Parameters.AddWithValue("$username", username);
             return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) != 0;
+        }
+    }
+
+    public bool UsernameExistsExcept(string username, long excludeId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(excludeId);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT EXISTS(SELECT 1 FROM accounts WHERE username = $username COLLATE NOCASE AND id <> $id)";
+            command.Parameters.AddWithValue("$username", username);
+            command.Parameters.AddWithValue("$id", excludeId);
+            return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) != 0;
+        }
+    }
+
+    public CamfrogAccount? GetById(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id,display_name,username,secret_name,profile_directory,
+                       enabled,status,process_id,started_utc,process_executable_path,last_error
+                FROM accounts WHERE id=$id;
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+                return null;
+            return new CamfrogAccount
+            {
+                Id = reader.GetInt64(0),
+                DisplayName = reader.GetString(1),
+                Username = reader.GetString(2),
+                PasswordSecretName = reader.GetString(3),
+                ProfileDirectory = reader.GetString(4),
+                Enabled = reader.GetInt64(5) != 0,
+                Status = reader.GetString(6),
+                ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                StartedAtUtc = reader.IsDBNull(8) ? null :
+                    DateTime.Parse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind),
+                ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                LastError = reader.GetString(10)
+            };
+        }
+    }
+
+    public void UpdateDetails(long id, string displayName, string username, bool enabled)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE accounts
+                SET display_name=$d, username=$u, enabled=$e
+                WHERE id=$id;
+                """;
+            command.Parameters.AddWithValue("$d", displayName.Trim());
+            command.Parameters.AddWithValue("$u", username.Trim());
+            command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetEnabled(long id, bool enabled)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET enabled=$e WHERE id=$id;";
+            command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public bool Delete(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM accounts WHERE id=$id;";
+            command.Parameters.AddWithValue("$id", id);
+            return command.ExecuteNonQuery() > 0;
+        }
+    }
+
+    public void ClearError(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET last_error='', status=CASE WHEN status='Error' THEN 'Stopped' ELSE status END WHERE id=$id;";
+            command.Parameters.AddWithValue("$id", id);
+            command.ExecuteNonQuery();
         }
     }
 
@@ -273,6 +389,34 @@ public sealed class CredentialService
         finally
         {
             CryptographicOperations.ZeroMemory(plain);
+        }
+    }
+
+    public bool Exists(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+        return File.Exists(SecretPath(name));
+    }
+
+    public bool Delete(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var path = SecretPath(name);
+        try
+        {
+            if (!File.Exists(path))
+                return false;
+            File.Delete(path);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
@@ -518,7 +662,50 @@ public sealed class ProcessSessionService
         return true;
     }
 
-    private static string ExpandArguments(string template, CamfrogAccount account) =>
+    public static string PreviewArguments(string? template, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        return ExpandArguments(template, account);
+    }
+
+    public static string PreviewCommandLine(string? executable, string? template, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var exe = string.IsNullOrWhiteSpace(executable) ? "<client-exe>" : executable.Trim();
+        var args = ExpandArguments(template, account);
+        return string.IsNullOrWhiteSpace(args) ? $"\"{exe}\"" : $"\"{exe}\" {args}";
+    }
+
+    public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)
+    {
+        var warnings = new List<string>();
+        if (string.IsNullOrWhiteSpace(template))
+            return warnings;
+        // Detect likely-unintended curly-brace tokens other than the two supported placeholders.
+        var i = 0;
+        while (i < template.Length)
+        {
+            var open = template.IndexOf('{', i);
+            if (open < 0)
+                break;
+            var close = template.IndexOf('}', open + 1);
+            if (close < 0)
+            {
+                warnings.Add("Unclosed '{' in arguments template.");
+                break;
+            }
+            var token = template.Substring(open, close - open + 1);
+            if (!string.Equals(token, "{username}", StringComparison.Ordinal) &&
+                !string.Equals(token, "{profile}", StringComparison.Ordinal))
+            {
+                warnings.Add($"Unsupported placeholder '{token}'. Supported: {{username}}, {{profile}}.");
+            }
+            i = close + 1;
+        }
+        return warnings;
+    }
+
+    private static string ExpandArguments(string? template, CamfrogAccount account) =>
         (template ?? string.Empty)
             .Replace("{username}", Quote(account.Username), StringComparison.Ordinal)
             .Replace("{profile}", Quote(account.ProfileDirectory), StringComparison.Ordinal);

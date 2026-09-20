@@ -283,3 +283,25 @@ Alternatively, for the current PowerShell session only:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\build-release.ps1
 ```
+
+## V14 production UI completion
+
+Camfrog client scope: rooms, contacts, IM, ponds, gifts, Pro multi-cam are in-client behaviors. This manager does not automate them; it provides deterministic multi-identity process isolation (profile directory, DPAPI secret, PID/start-time/exe validation, fail-closed reuse protection).
+
+Manager UI now completes the lifecycle:
+
+- Add / Edit (display, username case-insensitive unique, enabled, optional password replace) / Delete (confirmation, stops tracked process, removes DB row + DPAPI secret + profile) / Enable-Disable toggle / Change Password / Clear Error
+- Search by display, username, status; double-click edit; right-click context menu; F5 refresh, Delete delete, Enter start
+- Selected-account details: profile path + existence, secret + DPAPI state, exe path, PID, started UTC/local, full launch preview (`PreviewCommandLine`)
+- Status bar: total / running / error / disabled + client exe configured-missing state
+- Log: level filter (All/INFO/WARN/ERROR), tail 500 lines, auto-scroll toggle, clear view, open log folder
+- Settings: exe existence status, template placeholder validation (`{username}`, `{profile}` only, warn and confirm on unsupported), data folder display + open
+- Start All / Stop All with confirmations; Start skips already-alive tracked processes
+
+```powershell
+dotnet restore .\CamfrogMultiID.sln
+dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+dotnet test .\CamfrogMultiID.sln -c Release --no-build
+```
+
+51 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file).

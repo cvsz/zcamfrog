@@ -1,6 +1,9 @@
 using CamfrogMultiID.Infrastructure;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using CamfrogMultiID.Core;
 
@@ -10,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _refreshing;
+    private string _logLevelFilter = "All";
 
     public MainWindow()
     {
@@ -25,6 +29,40 @@ public partial class MainWindow : Window
         _timer.Start();
     }
 
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RefreshRuntimeState();
+
+    private void LogLevelBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LogLevelBox.SelectedItem is ComboBoxItem item && item.Content is string level)
+        {
+            _logLevelFilter = level;
+            RefreshRuntimeState();
+        }
+    }
+
+    private void AccountsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateDetails();
+
+    private void AccountsGrid_DoubleClick(object sender, MouseButtonEventArgs e) => EditSelected();
+
+    private void AccountsGrid_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F5)
+        {
+            RefreshRuntimeState();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Delete)
+        {
+            DeleteSelected();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter)
+        {
+            StartSelected();
+            e.Handled = true;
+        }
+    }
+
     private void RefreshRuntimeState()
     {
         if (_refreshing) return;
@@ -32,6 +70,8 @@ public partial class MainWindow : Window
 
         try
         {
+            var selectedId = (AccountsGrid.SelectedItem as CamfrogAccount)?.Id;
+
             foreach (var account in App.Db.GetAccounts())
             {
                 if (account.ProcessId is not int || !account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase))
@@ -44,17 +84,26 @@ public partial class MainWindow : Window
                 }
             }
 
-            AccountsGrid.ItemsSource = null;
-            AccountsGrid.ItemsSource = App.Db.GetAccounts();
+            var all = App.Db.GetAccounts();
+            var filter = SearchBox?.Text?.Trim() ?? string.Empty;
+            List<CamfrogAccount> view = string.IsNullOrWhiteSpace(filter)
+                ? all
+                : all.Where(a =>
+                    a.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                    a.Username.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                    a.Status.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
 
-            try
+            AccountsGrid.ItemsSource = view;
+            if (selectedId is long sid)
             {
-                var logFile = Path.Combine(App.Paths.Logs, "app.log");
-                LogBox.Text = File.Exists(logFile) ? File.ReadAllText(logFile) : string.Empty;
-                LogBox.ScrollToEnd();
+                var match = view.FirstOrDefault(a => a.Id == sid);
+                if (match is not null)
+                    AccountsGrid.SelectedItem = match;
             }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+
+            UpdateDetails(view);
+            UpdateStatusBar(all);
+            UpdateLogBox();
         }
         finally
         {
@@ -62,10 +111,226 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateDetails() => UpdateDetails(AccountsGrid.ItemsSource as IEnumerable<CamfrogAccount>);
+
+    private void UpdateDetails(IEnumerable<CamfrogAccount>? view)
+    {
+        if (AccountsGrid.SelectedItem is not CamfrogAccount account)
+        {
+            DetailsBox.Text = "Select an account to see isolation details and launch preview.";
+            return;
+        }
+
+        var settings = App.Settings.Load();
+        var preview = ProcessSessionService.PreviewCommandLine(settings.ClientExecutable, settings.ClientArgumentsTemplate, account);
+        var secretExists = App.Credentials.Exists(account.PasswordSecretName);
+        var profileExists = Directory.Exists(account.ProfileDirectory);
+        var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+        DetailsBox.Text =
+            $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}\n" +
+            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}\n" +
+            $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
+            $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
+            $"Launch: {preview}";
+    }
+
+    private void UpdateStatusBar(List<CamfrogAccount> all)
+    {
+        var running = all.Count(a => a.Status.Equals("Running", StringComparison.OrdinalIgnoreCase));
+        var err = all.Count(a => a.Status.Equals("Error", StringComparison.OrdinalIgnoreCase));
+        var disabled = all.Count(a => !a.Enabled);
+        StatusCounts.Text = $"Accounts: {all.Count}  Running: {running}  Error: {err}  Disabled: {disabled}";
+
+        var settings = App.Settings.Load();
+        StatusClient.Text = string.IsNullOrWhiteSpace(settings.ClientExecutable)
+            ? "Client: not configured (open Settings)"
+            : File.Exists(settings.ClientExecutable)
+                ? $"Client: {settings.ClientExecutable}"
+                : $"Client: missing — {settings.ClientExecutable}";
+    }
+
+    private void UpdateLogBox()
+    {
+        try
+        {
+            var logFile = Path.Combine(App.Paths.Logs, "app.log");
+            if (!File.Exists(logFile))
+            {
+                LogBox.Text = string.Empty;
+                return;
+            }
+
+            // Read tail to avoid loading huge logs into the UI.
+            var lines = File.ReadLines(logFile);
+            IEnumerable<string> filtered = _logLevelFilter.Equals("All", StringComparison.OrdinalIgnoreCase)
+                ? lines
+                : lines.Where(l => l.Contains($"[{_logLevelFilter}]", StringComparison.OrdinalIgnoreCase));
+            var tail = filtered.TakeLast(500);
+            LogBox.Text = string.Join(Environment.NewLine, tail);
+            if (AutoScrollBox?.IsChecked == true)
+                LogBox.ScrollToEnd();
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private CamfrogAccount? SelectedAccount() => AccountsGrid.SelectedItem as CamfrogAccount;
+
     private void Add_Click(object sender, RoutedEventArgs e)
     {
         if (new AccountWindow { Owner = this }.ShowDialog() == true)
             RefreshRuntimeState();
+    }
+
+    private void Edit_Click(object sender, RoutedEventArgs e) => EditSelected();
+
+    private void EditSelected()
+    {
+        var account = SelectedAccount();
+        if (account is null)
+        {
+            MessageBox.Show("Please select an account first.", "Edit Account",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var fresh = App.Db.GetById(account.Id);
+        if (fresh is null)
+        {
+            MessageBox.Show("The selected account no longer exists.", "Edit Account",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            RefreshRuntimeState();
+            return;
+        }
+        if (new AccountWindow(fresh) { Owner = this }.ShowDialog() == true)
+            RefreshRuntimeState();
+    }
+
+    private void Delete_Click(object sender, RoutedEventArgs e) => DeleteSelected();
+
+    private void DeleteSelected()
+    {
+        var account = SelectedAccount();
+        if (account is null)
+        {
+            MessageBox.Show("Please select an account first.", "Delete Account",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var fresh = App.Db.GetById(account.Id);
+        if (fresh is null)
+        {
+            RefreshRuntimeState();
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Delete account '{fresh.DisplayName}' ({fresh.Username})?\n\nThis removes the database row, DPAPI secret, and profile directory. This cannot be undone.",
+            "Confirm Delete",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            // Stop first if still tracked alive; fail-closed Stop refuses foreign PIDs.
+            if (fresh.ProcessId is int)
+            {
+                try { App.Sessions.Stop(fresh); } catch { }
+                fresh = App.Db.GetById(fresh.Id) ?? fresh;
+            }
+
+            var secretName = fresh.PasswordSecretName;
+            var profileDir = fresh.ProfileDirectory;
+            var name = fresh.DisplayName;
+
+            App.Db.Delete(fresh.Id);
+            App.Credentials.Delete(secretName);
+            try
+            {
+                if (Directory.Exists(profileDir))
+                    Directory.Delete(profileDir, true);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+
+            App.Db.Log("INFO", $"Deleted account '{name}' (id {fresh.Id}).");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to delete '{account.DisplayName}'.\n\n{ex.Message}",
+                "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            RefreshRuntimeState();
+        }
+    }
+
+    private void ToggleEnabled_Click(object sender, RoutedEventArgs e)
+    {
+        var account = SelectedAccount();
+        if (account is null)
+        {
+            MessageBox.Show("Please select an account first.", "Enable/Disable",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            App.Db.SetEnabled(account.Id, !account.Enabled);
+            App.Db.Log("INFO", $"Account '{account.DisplayName}' {(account.Enabled ? "disabled" : "enabled")}.");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to update '{account.DisplayName}'.\n\n{ex.Message}",
+                "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            RefreshRuntimeState();
+        }
+    }
+
+    private void ChangePassword_Click(object sender, RoutedEventArgs e)
+    {
+        var account = SelectedAccount();
+        if (account is null)
+        {
+            MessageBox.Show("Please select an account first.", "Change Password",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var dialog = new ChangePasswordWindow(account.DisplayName) { Owner = this };
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                App.Credentials.Save(account.PasswordSecretName, dialog.NewPassword);
+                App.Db.Log("INFO", $"Password updated for '{account.DisplayName}'.");
+                MessageBox.Show("Password updated (DPAPI protected).", "Change Password",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to update password.\n\n{ex.Message}",
+                    "Change Password", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private void ClearError_Click(object sender, RoutedEventArgs e)
+    {
+        var account = SelectedAccount();
+        if (account is null)
+        {
+            MessageBox.Show("Please select an account first.", "Clear Error",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        App.Db.ClearError(account.Id);
+        RefreshRuntimeState();
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -76,9 +341,27 @@ public partial class MainWindow : Window
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshRuntimeState();
 
-    private void StartSelected_Click(object sender, RoutedEventArgs e)
+    private void ClearLogView_Click(object sender, RoutedEventArgs e) => LogBox.Clear();
+
+    private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
     {
-        if (AccountsGrid.SelectedItem is CamfrogAccount account)
+        try
+        {
+            Directory.CreateDirectory(App.Paths.Logs);
+            Process.Start(new ProcessStartInfo { FileName = App.Paths.Logs, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to open log folder.\n\n{ex.Message}", "Logs",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void StartSelected_Click(object sender, RoutedEventArgs e) => StartSelected();
+
+    private void StartSelected()
+    {
+        if (SelectedAccount() is CamfrogAccount account)
             StartAccount(account);
         else
             MessageBox.Show("Please select an account first.", "Start Account",
@@ -87,7 +370,7 @@ public partial class MainWindow : Window
 
     private void StopSelected_Click(object sender, RoutedEventArgs e)
     {
-        if (AccountsGrid.SelectedItem is CamfrogAccount account)
+        if (SelectedAccount() is CamfrogAccount account)
             StopAccount(account);
         else
             MessageBox.Show("Please select an account first.", "Stop Account",
@@ -96,8 +379,23 @@ public partial class MainWindow : Window
 
     private void StartAll_Click(object sender, RoutedEventArgs e)
     {
+        var enabled = App.Db.GetAccounts().Where(a => a.Enabled).ToList();
+        if (enabled.Count == 0)
+        {
+            MessageBox.Show("No enabled accounts to start.", "Start All",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var confirm = MessageBox.Show(
+            $"Start {enabled.Count} enabled account(s)?\n\nVerify individual launch first; the client may ignore {{profile}} isolation.",
+            "Confirm Start All",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
         var settings = App.Settings.Load();
-        foreach (var account in App.Db.GetAccounts().Where(a => a.Enabled))
+        foreach (var account in enabled)
             StartAccount(account, settings);
 
         RefreshRuntimeState();
@@ -105,7 +403,18 @@ public partial class MainWindow : Window
 
     private void StopAll_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var account in App.Db.GetAccounts())
+        var all = App.Db.GetAccounts();
+        if (all.Count == 0)
+            return;
+        var confirm = MessageBox.Show(
+            $"Stop all {all.Count} account(s)?",
+            "Confirm Stop All",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        foreach (var account in all)
             StopAccount(account);
 
         RefreshRuntimeState();

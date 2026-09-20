@@ -4,6 +4,11 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 
 ## [Unreleased]
 ### Added
+- Account lifecycle: Edit (display/username/enabled + optional password replace), Delete with confirmation + secret/profile cleanup, Enable/Disable toggle, Change Password dialog, Clear Error
+- Main window: search/filter, selected-account details + launch preview, status bar (counts + client status), log level filter + tail 500 + auto-scroll + clear/open-folder, context menu, double-click edit, F5/Delete/Enter shortcuts, Start All / Stop All confirmations
+- Settings: exe existence status, template warning validation, data folder display + open-folder
+- Backend: `GetById`, `UpdateDetails`, `SetEnabled`, `Delete`, `ClearError`, `UsernameExistsExcept`, `CredentialService.Exists/Delete`, `PreviewCommandLine/PreviewArguments/ValidateArgumentsTemplate`
+- Tests: `AccountManagementTests` (12 tests) — total 51 tests
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build

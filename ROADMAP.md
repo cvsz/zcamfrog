@@ -9,8 +9,9 @@
 - [x] Docs: architecture, development, release synchronized
 
 ## Next
-- [ ] UI: edit/delete account, enable/disable, search/filter
-- [ ] UI: per-account launch arguments preview and validation
+- [x] UI: edit/delete account, enable/disable, search/filter
+- [x] UI: per-account launch arguments preview and validation
+- [x] UI: selected-account details, status bar, log filter, context menu + shortcuts, change password, clear error
 - [ ] Process: auto-restart on crash (opt-in), health dashboard
 - [ ] Persistence: backup/restore of `camfrog.db` and `secrets/`
 - [ ] Security: additional hardening (ACL on secrets, audit log)

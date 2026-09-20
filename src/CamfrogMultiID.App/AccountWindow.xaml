@@ -1,25 +1,28 @@
 <Window x:Class="CamfrogMultiID.App.AccountWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Add Camfrog Account" Width="460" Height="330"
+        Title="Add Camfrog Account" Width="480" Height="420"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="Display name" Margin="0,0,0,5"/>
-        <TextBox Grid.Row="1" x:Name="DisplayNameTextBox" Height="30" Margin="0,0,0,12"/>
+        <TextBox Grid.Row="1" x:Name="DisplayNameTextBox" Height="30" Margin="0,0,0,12" MaxLength="80"/>
         <TextBlock Grid.Row="2" Text="Username" Margin="0,0,0,5"/>
-        <TextBox Grid.Row="3" x:Name="UsernameTextBox" Height="30" Margin="0,0,0,12"/>
+        <TextBox Grid.Row="3" x:Name="UsernameTextBox" Height="30" Margin="0,0,0,12" MaxLength="80"/>
         <StackPanel Grid.Row="4">
-            <TextBlock Text="Password" Margin="0,0,0,5"/>
-            <PasswordBox x:Name="PasswordInput" Height="30" Margin="0,0,0,10"/>
+            <TextBlock x:Name="PasswordLabel" Text="Password" Margin="0,0,0,5"/>
+            <PasswordBox x:Name="PasswordInput" Height="30" Margin="0,0,0,4"/>
+            <TextBlock x:Name="PasswordHint" Text="Stored with Windows DPAPI (CurrentUser). Never logged or passed on the command line." Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,10"/>
             <CheckBox x:Name="EnabledCheckBox" Content="Enabled" IsChecked="True"/>
         </StackPanel>
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
+        <TextBlock Grid.Row="6" x:Name="EditHint" Text="" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" Click="Cancel_Click" IsCancel="True"/>
             <Button Content="Save" Click="Save_Click" IsDefault="True"/>
         </StackPanel>

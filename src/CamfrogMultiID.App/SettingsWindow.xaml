@@ -1,11 +1,13 @@
-<Window x:Class="CamfrogMultiID.App.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Settings" Width="720" Height="260" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+<Window x:Class="CamfrogMultiID.App.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Settings" Width="740" Height="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="18">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <TextBlock Text="Camfrog client executable"/>
-        <DockPanel Grid.Row="1" Margin="0,4,0,12"><Button DockPanel.Dock="Right" Content="Browse..." Click="Browse_Click" Width="100"/><TextBox x:Name="Exe" Margin="0,0,8,0"/></DockPanel>
-        <TextBlock Grid.Row="2" Text="Client arguments template (optional)"/>
-        <TextBox Grid.Row="3" x:Name="Args" Margin="0,4,0,4" VerticalContentAlignment="Center"/>
-        <TextBlock Grid.Row="3" Text="Supported placeholders: {username}, {profile}. Leave blank unless your installed client documents these options." VerticalAlignment="Bottom" Margin="0,0,0,7" Foreground="Gray" IsHitTestVisible="False"/>
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Cancel" Click="Cancel_Click" IsCancel="True"/><Button Content="Save" Click="Save_Click" IsDefault="True"/></StackPanel>
+        <DockPanel Grid.Row="1" Margin="0,4,0,8"><Button DockPanel.Dock="Right" Content="Browse..." Click="Browse_Click" Width="100"/><TextBox x:Name="Exe" Margin="0,0,8,0"/></DockPanel>
+        <TextBlock Grid.Row="2" x:Name="ExeStatus" Foreground="Gray" Margin="0,0,0,8" TextWrapping="Wrap"/>
+        <TextBlock Grid.Row="3" Text="Client arguments template (optional)"/>
+        <TextBox Grid.Row="4" x:Name="Args" Margin="0,4,0,4" VerticalContentAlignment="Center" Height="30"/>
+        <TextBlock Grid.Row="5" TextWrapping="Wrap" Margin="0,0,0,4" Text="Supported placeholders: {username}, {profile}. Leave blank unless your installed client documents these options. Password is never injected."/>
+        <DockPanel Grid.Row="6" Margin="0,8,0,8"><TextBlock x:Name="DataDirText" VerticalAlignment="Center" TextWrapping="Wrap"/><Button DockPanel.Dock="Right" Content="Open Data Folder" Click="OpenFolder_Click" Width="130" Margin="8,0,0,0"/></DockPanel>
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Cancel" Click="Cancel_Click" IsCancel="True"/><Button Content="Save" Click="Save_Click" IsDefault="True"/></StackPanel>
     </Grid>
 </Window>

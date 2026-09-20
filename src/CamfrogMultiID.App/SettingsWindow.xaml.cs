@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using CamfrogMultiID.Core;
+using CamfrogMultiID.Infrastructure;
 
 namespace CamfrogMultiID.App;
 
@@ -13,12 +15,52 @@ public partial class SettingsWindow : Window
         var settings = App.Settings.Load();
         Exe.Text = settings.ClientExecutable;
         Args.Text = settings.ClientArgumentsTemplate;
+        DataDirText.Text = $"Data: {App.Paths.Root}";
+        UpdateExeStatus();
+        Exe.TextChanged += (_, _) => UpdateExeStatus();
+        Args.TextChanged += (_, _) => UpdateExeStatus();
+    }
+
+    private void UpdateExeStatus()
+    {
+        var exe = Exe.Text.Trim();
+        if (string.IsNullOrWhiteSpace(exe))
+        {
+            ExeStatus.Text = "No client executable configured. Start operations will be disabled until configured.";
+            return;
+        }
+        if (!File.Exists(exe))
+        {
+            ExeStatus.Text = "Warning: the selected executable does not exist.";
+            return;
+        }
+        var warnings = ProcessSessionService.ValidateArgumentsTemplate(Args.Text.Trim());
+        ExeStatus.Text = warnings.Count == 0
+            ? $"Executable found. Arguments preview uses {{username}} and {{profile}} only."
+            : $"Executable found. Template warning: {string.Join(" ", warnings)}";
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Filter = "Executable (*.exe)|*.exe|All files (*.*)|*.*", CheckFileExists = true };
-        if (dialog.ShowDialog(this) == true) Exe.Text = dialog.FileName;
+        if (dialog.ShowDialog(this) == true)
+        {
+            Exe.Text = dialog.FileName;
+            UpdateExeStatus();
+        }
+    }
+
+    private void OpenFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(App.Paths.Root);
+            Process.Start(new ProcessStartInfo { FileName = App.Paths.Root, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to open data folder.\n\n{ex.Message}", "Open Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
@@ -26,14 +68,26 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         var executable = Exe.Text.Trim();
+        var template = Args.Text.Trim();
         if (!string.IsNullOrWhiteSpace(executable) && !File.Exists(executable))
         {
             MessageBox.Show("The selected executable does not exist.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        var warnings = ProcessSessionService.ValidateArgumentsTemplate(template);
+        if (warnings.Count > 0)
+        {
+            var result = MessageBox.Show(
+                $"Arguments template has warnings:\n\n{string.Join("\n", warnings)}\n\nSave anyway?",
+                "Template Warning",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes)
+                return;
+        }
         try
         {
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = Args.Text.Trim() });
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template });
             App.Db.Log("INFO", "Settings saved.");
             DialogResult = true;
         }
