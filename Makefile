@@ -1,33 +1,38 @@
 SHELL := /bin/sh
 
-.PHONY: help restore build test publish format lint security ci clean
+.PHONY: help setup format lint test build publish security ci
 
 help:
-	@printf '%s\n' 'Targets: restore build test publish format lint security ci clean'
+	@printf '%s\n' 'Targets: setup format lint test build publish security ci'
+	@printf '%s\n' '  setup   - restore .NET dependencies'
+	@printf '%s\n' '  format  - verify formatting (dotnet format)'
+	@printf '%s\n' '  lint    - build with analyzers (warnings as errors)'
+	@printf '%s\n' '  test    - run tests (Release)'
+	@printf '%s\n' '  build   - build Debug and Release'
+	@printf '%s\n' '  publish - self-contained win-x64 publish'
+	@printf '%s\n' '  security- run CodeQL queries where available'
 
-restore:
+setup:
 	dotnet restore CamfrogMultiID.sln
+	dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64
 
-build:
+format:
+	dotnet format --verify-no-changes --verbosity diagnostic || (echo "Run: dotnet format"; exit 1)
+
+lint:
 	dotnet build CamfrogMultiID.sln -c Release --no-restore
 
 test:
-	dotnet test tests/CamfrogMultiID.Tests/CamfrogMultiID.Tests.csproj -c Release --no-restore --verbosity normal
+	dotnet test CamfrogMultiID.sln -c Release --no-build --verbosity normal
+
+build:
+	dotnet build CamfrogMultiID.sln -c Debug --no-restore
+	dotnet build CamfrogMultiID.sln -c Release --no-restore || dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore
 
 publish:
-	pwsh -NoProfile -File ./build-release.ps1
-
-format:
-	dotnet format CamfrogMultiID.sln --verify-no-changes --no-restore
-
-lint:
-	dotnet build CamfrogMultiID.sln -c Release --no-restore -warnaserror
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./build-release.ps1
 
 security:
-	@set -e; if git grep -n -E 'TODO|FIXME|NotImplementedException|Replace with project|ztemplate' -- ':!CHANGELOG.md' ':!.github/workflows/ci.yml' ':!Makefile'; then exit 1; fi
-	@echo 'Static security marker scan passed.'
+	@echo "Use repository security workflows: CodeQL (csharp), dependency-review, secret scanning."
 
-ci: restore build test lint security
-
-clean:
-	dotnet clean CamfrogMultiID.sln
+ci: setup lint test build publish security

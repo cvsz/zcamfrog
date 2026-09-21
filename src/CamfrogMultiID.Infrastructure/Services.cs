@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -18,16 +16,46 @@ public sealed class AppPaths
     public string Logs => Path.Combine(Root, "logs");
     public string Settings => Path.Combine(Root, "settings.json");
 
-    public AppPaths(string? root = null)
+    public AppPaths() : this(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CamfrogMultiID"))
     {
-        Root = string.IsNullOrWhiteSpace(root)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CamfrogMultiID")
-            : Path.GetFullPath(root);
+    }
 
+    public AppPaths(string root)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        Root = Path.GetFullPath(root);
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(Profiles);
         Directory.CreateDirectory(Secrets);
         Directory.CreateDirectory(Logs);
+        RestrictSecretsAccess();
+    }
+
+    private void RestrictSecretsAccess()
+    {
+        // Best-effort: DPAPI blobs should be reachable only by the current user.
+        // Never let an ACL failure break startup.
+        try
+        {
+            var identity = System.Security.Principal.WindowsIdentity.GetCurrent()?.Name;
+            if (string.IsNullOrWhiteSpace(identity))
+                return;
+            var security = new DirectoryInfo(Secrets).GetAccessControl();
+            security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                identity,
+                System.Security.AccessControl.FileSystemRights.FullControl,
+                System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                System.Security.AccessControl.PropagationFlags.None,
+                System.Security.AccessControl.AccessControlType.Allow));
+            new DirectoryInfo(Secrets).SetAccessControl(security);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (PlatformNotSupportedException) { }
+        catch (InvalidOperationException) { }
     }
 }
 
@@ -43,7 +71,7 @@ public sealed class DatabaseService
         var connection = new SqliteConnection($"Data Source={_paths.Database};Cache=Shared");
         connection.Open();
         using var pragma = connection.CreateCommand();
-        pragma.CommandText = "PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;";
+        pragma.CommandText = "PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;";
         pragma.ExecuteNonQuery();
         return connection;
     }
@@ -66,7 +94,10 @@ public sealed class DatabaseService
                     process_id INTEGER,
                     started_utc TEXT,
                     process_executable_path TEXT NOT NULL DEFAULT '',
-                    last_error TEXT NOT NULL DEFAULT ''
+                    last_error TEXT NOT NULL DEFAULT '',
+                    room_url TEXT NOT NULL DEFAULT '',
+                    auto_restart INTEGER NOT NULL DEFAULT 0,
+                    password_changed_utc TEXT NOT NULL DEFAULT ''
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_username ON accounts(username COLLATE NOCASE);
                 CREATE TABLE IF NOT EXISTS events (
@@ -78,8 +109,11 @@ public sealed class DatabaseService
                 """;
             command.ExecuteNonQuery();
 
+            // Forward-compatible migration for databases created by older builds.
             EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
-            EnsureColumn(connection, "accounts", "last_error", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(connection, "accounts", "password_changed_utc", "TEXT NOT NULL DEFAULT ''");
         }
     }
 
@@ -107,81 +141,228 @@ public sealed class DatabaseService
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart,password_changed_utc
                 FROM accounts ORDER BY id;
                 """;
             using var reader = command.ExecuteReader();
             var result = new List<CamfrogAccount>();
             while (reader.Read())
             {
-                result.Add(ReadAccount(reader));
+                result.Add(new CamfrogAccount
+                {
+                    Id = reader.GetInt64(0),
+                    DisplayName = reader.GetString(1),
+                    Username = reader.GetString(2),
+                    PasswordSecretName = reader.GetString(3),
+                    ProfileDirectory = reader.GetString(4),
+                    Enabled = reader.GetInt64(5) != 0,
+                    Status = reader.GetString(6),
+                    ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                    StartedAtUtc = reader.IsDBNull(8) ? null :
+                        (DateTime.TryParse(reader.GetString(8), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedStart) ? parsedStart : null),
+                    ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                    LastError = reader.GetString(10),
+                    RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+                    AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0,
+                    PasswordChangedUtc = ReadNullableDate(reader, 13)
+                });
             }
             return result;
         }
     }
 
-    public CamfrogAccount? GetAccount(long id)
-    {
-        lock (_gate)
-        {
-            using var connection = Open();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT id,display_name,username,secret_name,profile_directory,
-                       enabled,status,process_id,started_utc,process_executable_path,last_error
-                FROM accounts WHERE id=$id;
-                """;
-            command.Parameters.AddWithValue("$id", id);
-            using var reader = command.ExecuteReader();
-            return reader.Read() ? ReadAccount(reader) : null;
-        }
-    }
-
-    private static CamfrogAccount ReadAccount(SqliteDataReader reader) =>
-        new()
-        {
-            Id = reader.GetInt64(0),
-            DisplayName = reader.GetString(1),
-            Username = reader.GetString(2),
-            PasswordSecretName = reader.GetString(3),
-            ProfileDirectory = reader.GetString(4),
-            Enabled = reader.GetInt64(5) != 0,
-            Status = reader.GetString(6),
-            ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
-            StartedAtUtc = reader.IsDBNull(8)
-                ? null
-                : DateTime.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-            LastError = reader.GetString(10)
-        };
+    private static DateTime? ReadNullableDate(Microsoft.Data.Sqlite.SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) || string.IsNullOrWhiteSpace(reader.GetString(ordinal)) ? null :
+            (DateTime.TryParse(reader.GetString(ordinal), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) ? parsed : null);
 
     public bool UsernameExists(string username)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
-
         lock (_gate)
         {
             using var connection = Open();
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT EXISTS(SELECT 1 FROM accounts WHERE username = $username COLLATE NOCASE)";
             command.Parameters.AddWithValue("$username", username);
-            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
+            return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) != 0;
+        }
+    }
+
+    public bool UsernameExistsExcept(string username, long excludeId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(excludeId);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT EXISTS(SELECT 1 FROM accounts WHERE username = $username COLLATE NOCASE AND id <> $id)";
+            command.Parameters.AddWithValue("$username", username);
+            command.Parameters.AddWithValue("$id", excludeId);
+            return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) != 0;
+        }
+    }
+
+    public CamfrogAccount? GetById(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT id,display_name,username,secret_name,profile_directory,
+                       enabled,status,process_id,started_utc,process_executable_path,last_error,room_url,auto_restart,password_changed_utc
+                FROM accounts WHERE id=$id;
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+                return null;
+            return new CamfrogAccount
+            {
+                Id = reader.GetInt64(0),
+                DisplayName = reader.GetString(1),
+                Username = reader.GetString(2),
+                PasswordSecretName = reader.GetString(3),
+                ProfileDirectory = reader.GetString(4),
+                Enabled = reader.GetInt64(5) != 0,
+                Status = reader.GetString(6),
+                ProcessId = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                StartedAtUtc = ReadNullableDate(reader, 8),
+                ProcessExecutablePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                LastError = reader.GetString(10),
+                RoomUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+                AutoRestart = !reader.IsDBNull(12) && reader.GetInt64(12) != 0,
+                PasswordChangedUtc = ReadNullableDate(reader, 13)
+            };
+        }
+    }
+
+    public void UpdateDetails(long id, string displayName, string username, bool enabled)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE accounts
+                SET display_name=$d, username=$u, enabled=$e
+                WHERE id=$id;
+                """;
+            command.Parameters.AddWithValue("$d", displayName.Trim());
+            command.Parameters.AddWithValue("$u", username.Trim());
+            command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetRoomUrl(long id, string roomUrl)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET room_url=$r WHERE id=$id;";
+            command.Parameters.AddWithValue("$r", roomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetPasswordChanged(long id, DateTime changedUtc)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET password_changed_utc=$t WHERE id=$id;";
+            command.Parameters.AddWithValue("$t", changedUtc.ToUniversalTime().ToString("O"));
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetAutoRestart(long id, bool autoRestart)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET auto_restart=$a WHERE id=$id;";
+            command.Parameters.AddWithValue("$a", autoRestart ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public void SetEnabled(long id, bool enabled)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET enabled=$e WHERE id=$id;";
+            command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$id", id);
+            var rows = command.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException($"Account id {id} was not found.");
+        }
+    }
+
+    public bool Delete(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM accounts WHERE id=$id;";
+            command.Parameters.AddWithValue("$id", id);
+            return command.ExecuteNonQuery() > 0;
+        }
+    }
+
+    public void ClearError(long id)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE accounts SET last_error='', status=CASE WHEN status='Error' THEN 'Stopped' ELSE status END WHERE id=$id;";
+            command.Parameters.AddWithValue("$id", id);
+            command.ExecuteNonQuery();
         }
     }
 
     public long Add(CamfrogAccount account)
     {
-        ArgumentNullException.ThrowIfNull(account);
-        ValidateAccount(account);
-
         lock (_gate)
         {
             using var connection = Open();
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO accounts
-                    (display_name,username,secret_name,profile_directory,enabled)
-                VALUES($d,$u,$s,$p,$e);
+                    (display_name,username,secret_name,profile_directory,enabled,room_url,auto_restart)
+                VALUES($d,$u,$s,$p,$e,$r,$a);
                 SELECT last_insert_rowid();
                 """;
             command.Parameters.AddWithValue("$d", account.DisplayName);
@@ -189,45 +370,14 @@ public sealed class DatabaseService
             command.Parameters.AddWithValue("$s", account.PasswordSecretName);
             command.Parameters.AddWithValue("$p", account.ProfileDirectory);
             command.Parameters.AddWithValue("$e", account.Enabled ? 1 : 0);
-            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
-        }
-    }
-
-    public void Delete(long id)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-
-        lock (_gate)
-        {
-            using var connection = Open();
-            using var transaction = connection.BeginTransaction();
-
-            using var check = connection.CreateCommand();
-            check.Transaction = transaction;
-            check.CommandText = "SELECT status FROM accounts WHERE id=$id;";
-            check.Parameters.AddWithValue("$id", id);
-            var status = check.ExecuteScalar()?.ToString();
-
-            if (status is null)
-                throw new InvalidOperationException("The account no longer exists.");
-
-            if (status.Equals("Running", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Stop the account before deleting it.");
-
-            using var delete = connection.CreateCommand();
-            delete.Transaction = transaction;
-            delete.CommandText = "DELETE FROM accounts WHERE id=$id;";
-            delete.Parameters.AddWithValue("$id", id);
-            delete.ExecuteNonQuery();
-
-            transaction.Commit();
+            command.Parameters.AddWithValue("$r", account.RoomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$a", account.AutoRestart ? 1 : 0);
+            return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 
     public void UpdateRuntime(long id, string status, int? pid, DateTime? started, string error = "", string executablePath = "")
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(status);
-
         lock (_gate)
         {
             using var connection = Open();
@@ -240,7 +390,7 @@ public sealed class DatabaseService
                 """;
             command.Parameters.AddWithValue("$s", status);
             command.Parameters.AddWithValue("$p", (object?)pid ?? DBNull.Value);
-            command.Parameters.AddWithValue("$t", (object?)started?.ToString("O", CultureInfo.InvariantCulture) ?? DBNull.Value);
+            command.Parameters.AddWithValue("$t", (object?)started?.ToString("O") ?? DBNull.Value);
             command.Parameters.AddWithValue("$x", executablePath ?? string.Empty);
             command.Parameters.AddWithValue("$e", error ?? string.Empty);
             command.Parameters.AddWithValue("$id", id);
@@ -250,13 +400,10 @@ public sealed class DatabaseService
 
     public void Log(string level, string message)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(level);
-        ArgumentNullException.ThrowIfNull(message);
-
         lock (_gate)
         {
             var safeMessage = message.Replace("\r", " ").Replace("\n", " ");
-            var utc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            var utc = DateTime.UtcNow.ToString("O");
 
             try
             {
@@ -268,7 +415,7 @@ public sealed class DatabaseService
                 command.Parameters.AddWithValue("$m", safeMessage);
                 command.ExecuteNonQuery();
             }
-            catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
+            catch (Exception _ex) when (_ex is SqliteException or IOException or UnauthorizedAccessException)
             {
                 // Logging is best-effort and must never take down the manager.
             }
@@ -280,23 +427,11 @@ public sealed class DatabaseService
                 File.AppendAllText(
                     logPath,
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {safeMessage}{Environment.NewLine}",
-                    new UTF8Encoding(false));
+                    Encoding.UTF8);
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
-    }
-
-    private static void ValidateAccount(CamfrogAccount account)
-    {
-        if (string.IsNullOrWhiteSpace(account.DisplayName))
-            throw new ArgumentException("Display name is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.Username))
-            throw new ArgumentException("Username is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.PasswordSecretName))
-            throw new ArgumentException("Password secret name is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.ProfileDirectory))
-            throw new ArgumentException("Profile directory is required.", nameof(account));
     }
 
     private static void RotateLogIfNeeded(string path)
@@ -321,39 +456,21 @@ public sealed class CredentialService
     private readonly AppPaths _paths;
     public CredentialService(AppPaths paths) => _paths = paths;
 
-    private string SecretPath(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-            name.Contains(Path.DirectorySeparatorChar) ||
-            name.Contains(Path.AltDirectorySeparatorChar) ||
-            name is "." or "..")
-            throw new ArgumentException("Invalid secret name.", nameof(name));
-
-        return Path.Combine(_paths.Secrets, name + ".bin");
-    }
+    private string SecretPath(string name) => Path.Combine(_paths.Secrets, name + ".bin");
 
     public void Save(string name, string password)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(password);
-        var path = SecretPath(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var plain = Encoding.UTF8.GetBytes(password);
-
         try
         {
             var protectedBytes = ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser);
             try
             {
+                var path = SecretPath(name);
                 var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                try
-                {
-                    File.WriteAllBytes(temp, protectedBytes);
-                    File.Move(temp, path, true);
-                }
-                finally
-                {
-                    try { if (File.Exists(temp)) File.Delete(temp); } catch { }
-                }
+                File.WriteAllBytes(temp, protectedBytes);
+                File.Move(temp, path, true);
             }
             finally
             {
@@ -363,6 +480,34 @@ public sealed class CredentialService
         finally
         {
             CryptographicOperations.ZeroMemory(plain);
+        }
+    }
+
+    public bool Exists(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+        return File.Exists(SecretPath(name));
+    }
+
+    public bool Delete(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var path = SecretPath(name);
+        try
+        {
+            if (!File.Exists(path))
+                return false;
+            File.Delete(path);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
@@ -383,13 +528,6 @@ public sealed class CredentialService
             CryptographicOperations.ZeroMemory(protectedBytes);
         }
     }
-
-    public void Delete(string name)
-    {
-        var path = SecretPath(name);
-        if (!File.Exists(path)) return;
-        File.Delete(path);
-    }
 }
 
 public sealed class SettingsService
@@ -406,10 +544,8 @@ public sealed class SettingsService
             if (!File.Exists(_paths.Settings))
                 return Defaults();
 
-            var settings = JsonSerializer.Deserialize<AppSettings>(
-                File.ReadAllText(_paths.Settings, Encoding.UTF8));
-
-            return settings ?? Defaults();
+            return JsonSerializer.Deserialize<AppSettings>(
+                       File.ReadAllText(_paths.Settings, Encoding.UTF8)) ?? Defaults();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -419,25 +555,8 @@ public sealed class SettingsService
 
     public void Save(AppSettings settings)
     {
-        ArgumentNullException.ThrowIfNull(settings);
-        var executable = settings.ClientExecutable?.Trim() ?? string.Empty;
-        var args = settings.ClientArgumentsTemplate?.Trim() ?? string.Empty;
-
-        if (!string.IsNullOrWhiteSpace(executable))
-        {
-            executable = Path.GetFullPath(executable);
-            if (!File.Exists(executable))
-                throw new FileNotFoundException("The configured client executable does not exist.", executable);
-        }
-
-        var normalized = new AppSettings
-        {
-            ClientExecutable = executable,
-            ClientArgumentsTemplate = args,
-            DataDirectory = _paths.Root
-        };
-
-        var json = JsonSerializer.Serialize(normalized, _jsonOptions);
+        settings.DataDirectory = _paths.Root;
+        var json = JsonSerializer.Serialize(settings, _jsonOptions);
         var temp = _paths.Settings + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
         try
@@ -462,9 +581,6 @@ public sealed class ProcessSessionService
 
     public Process Start(CamfrogAccount account, AppSettings settings)
     {
-        ArgumentNullException.ThrowIfNull(account);
-        ArgumentNullException.ThrowIfNull(settings);
-
         if (string.IsNullOrWhiteSpace(settings.ClientExecutable))
             throw new InvalidOperationException("Configure the Camfrog client executable first.");
 
@@ -475,14 +591,42 @@ public sealed class ProcessSessionService
         Directory.CreateDirectory(account.ProfileDirectory);
 
         var args = ExpandArguments(settings.ClientArgumentsTemplate, account);
-        var workingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory;
-        var psi = new ProcessStartInfo
+        if (!string.IsNullOrWhiteSpace(account.RoomUrl))
+            args = string.IsNullOrWhiteSpace(args)
+                ? $"--url={Quote(NormalizeRoomUrl(account.RoomUrl))}"
+                : $"{args} --url={Quote(NormalizeRoomUrl(account.RoomUrl))}";
+
+        var trackedExecutable = executable;
+        ProcessStartInfo psi;
+        if (settings.UseSandboxie)
         {
-            FileName = executable,
-            Arguments = args,
-            UseShellExecute = false,
-            WorkingDirectory = workingDirectory
-        };
+            var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
+                ? FindSandboxieStart()
+                : Path.GetFullPath(settings.SandboxieStartExe);
+            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+                throw new FileNotFoundException("Sandboxie Start.exe was not found. Install Sandboxie-Plus or configure its path in Settings.", startExe ?? string.Empty);
+            trackedExecutable = startExe;
+            psi = new ProcessStartInfo
+            {
+                FileName = startExe,
+                // /wait keeps Start.exe alive while the sandboxed client runs, so the
+                // tracked PID stays valid for the whole session.
+                Arguments = $"/wait /Box:{Quote(SanitizeBoxName(account))} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory
+            };
+        }
+        else
+        {
+            var workingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory;
+            psi = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = args,
+                UseShellExecute = true,
+                WorkingDirectory = workingDirectory
+            };
+        }
 
         var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Could not start the client process.");
@@ -495,11 +639,11 @@ public sealed class ProcessSessionService
         account.StartedAtUtc = startedUtc;
         account.Status = "Running";
         account.LastError = string.Empty;
-        account.ProcessExecutablePath = executable;
+        account.ProcessExecutablePath = trackedExecutable;
 
         try
         {
-            _database.UpdateRuntime(account.Id, "Running", process.Id, startedUtc, "", executable);
+            _database.UpdateRuntime(account.Id, "Running", process.Id, startedUtc, "", trackedExecutable);
         }
         catch
         {
@@ -510,7 +654,6 @@ public sealed class ProcessSessionService
             }
             catch { }
 
-            process.Dispose();
             throw;
         }
 
@@ -520,8 +663,6 @@ public sealed class ProcessSessionService
 
     public void Stop(CamfrogAccount account)
     {
-        ArgumentNullException.ThrowIfNull(account);
-
         if (account.ProcessId is not int pid)
         {
             _database.UpdateRuntime(account.Id, "Stopped", null, null);
@@ -532,10 +673,11 @@ public sealed class ProcessSessionService
         {
             using var process = Process.GetProcessById(pid);
 
-            if (!TryMatchTrackedProcess(process, account, out var reason))
+            if (!MatchesTrackedProcess(process, account))
             {
-                _database.Log("WARN", $"Refusing to terminate PID {pid} for account '{account.DisplayName}': {reason}");
-                throw new InvalidOperationException($"Cannot safely verify the tracked process: {reason}");
+                _database.Log("WARN", $"PID {pid} no longer matches account '{account.DisplayName}'; refusing to terminate it.");
+                _database.UpdateRuntime(account.Id, "Stopped", null, null, "Tracked process no longer matches.");
+                return;
             }
 
             if (!process.HasExited)
@@ -557,7 +699,7 @@ public sealed class ProcessSessionService
             _database.UpdateRuntime(account.Id, "Stopped", null, null);
             _database.Log("INFO", $"Account '{account.DisplayName}' process PID {pid} was already gone.");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             _database.UpdateRuntime(account.Id, "Error", pid, account.StartedAtUtc, ex.Message, account.ProcessExecutablePath);
             _database.Log("ERROR", $"Failed to stop account '{account.DisplayName}' (PID {pid}): {ex.Message}");
@@ -583,8 +725,11 @@ public sealed class ProcessSessionService
                 return false;
             }
 
-            if (!TryMatchTrackedProcess(process, account, out reason))
+            if (!MatchesTrackedProcess(process, account))
+            {
+                reason = "PID was reused by a different process.";
                 return false;
+            }
 
             return true;
         }
@@ -593,97 +738,217 @@ public sealed class ProcessSessionService
             reason = "Process no longer exists.";
             return false;
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            reason = $"Unable to verify process identity: {ex.Message}";
-            return false;
-        }
-        catch (Win32Exception ex)
-        {
-            reason = $"Unable to verify process identity: {ex.Message}";
-            return false;
+            reason = "Process state is unavailable.";
+            return true;
         }
     }
 
-    private static bool TryMatchTrackedProcess(Process process, CamfrogAccount account, out string reason)
+    private static bool MatchesTrackedProcess(Process process, CamfrogAccount account)
     {
-        reason = string.Empty;
-
         if (account.ProcessId is not int || process.HasExited)
-        {
-            reason = "Process no longer exists.";
             return false;
-        }
 
         if (account.StartedAtUtc is DateTime expectedStart)
         {
-            DateTime actualStart;
             try
             {
-                actualStart = process.StartTime.ToUniversalTime();
+                var actual = process.StartTime.ToUniversalTime();
+                if (Math.Abs((actual - expectedStart.ToUniversalTime()).TotalSeconds) > 5)
+                    return false;
             }
-            catch (InvalidOperationException ex)
-            {
-                reason = ex.Message;
-                return false;
-            }
-            catch (Win32Exception ex)
-            {
-                reason = ex.Message;
-                return false;
-            }
-
-            if (Math.Abs((actualStart - expectedStart.ToUniversalTime()).TotalSeconds) > 5)
-            {
-                reason = "PID was reused by a different process.";
-                return false;
-            }
+            catch (InvalidOperationException) { }
+            catch (System.ComponentModel.Win32Exception) { }
         }
 
         if (!string.IsNullOrWhiteSpace(account.ProcessExecutablePath))
         {
-            string? actualPath;
             try
             {
-                actualPath = process.MainModule?.FileName;
+                var actualPath = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(actualPath) &&
+                    !string.Equals(
+                        Path.GetFullPath(actualPath),
+                        Path.GetFullPath(account.ProcessExecutablePath),
+                        StringComparison.OrdinalIgnoreCase))
+                    return false;
             }
-            catch (InvalidOperationException ex)
-            {
-                reason = ex.Message;
-                return false;
-            }
-            catch (Win32Exception ex)
-            {
-                reason = ex.Message;
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(actualPath))
-            {
-                reason = "The process executable path could not be verified.";
-                return false;
-            }
-
-            if (!string.Equals(
-                    Path.GetFullPath(actualPath),
-                    Path.GetFullPath(account.ProcessExecutablePath),
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                reason = "Process executable path does not match the tracked executable.";
-                return false;
-            }
+            catch (System.ComponentModel.Win32Exception) { }
+            catch (InvalidOperationException) { }
         }
 
         return true;
     }
 
-    private static string ExpandArguments(string template, CamfrogAccount account) =>
+    public static string PreviewArguments(string? template, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        return ExpandArguments(template, account);
+    }
+
+    public static string PreviewCommandLine(string? executable, string? template, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var exe = string.IsNullOrWhiteSpace(executable) ? "<client-exe>" : executable.Trim();
+        var args = ExpandArguments(template, account);
+        if (!string.IsNullOrWhiteSpace(account.RoomUrl))
+            args = string.IsNullOrWhiteSpace(args)
+                ? $"--url={Quote(account.RoomUrl.Trim())}"
+                : $"{args} --url={Quote(account.RoomUrl.Trim())}";
+        return string.IsNullOrWhiteSpace(args) ? $"\"{exe}\"" : $"\"{exe}\" {args}";
+    }
+
+    public static string PreviewLaunch(AppSettings settings, CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(account);
+        var inner = PreviewCommandLine(settings.ClientExecutable, settings.ClientArgumentsTemplate, account);
+        if (!settings.UseSandboxie)
+            return inner;
+        var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe) ? FindSandboxieStart() ?? "<Start.exe>" : settings.SandboxieStartExe;
+        return $"\"{startExe}\" /wait /Box:{Quote(SanitizeBoxName(account))} {inner}";
+    }
+
+    public static string NormalizeRoomUrl(string roomUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomUrl);
+        var trimmed = roomUrl.Trim();
+        if (!trimmed.StartsWith("camfrog:", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Room URL must use the camfrog: scheme (copy the room link from the client room directory).");
+        if (trimmed.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
+            throw new InvalidOperationException("Room URL must not contain whitespace or control characters.");
+        return trimmed;
+    }
+
+    public static string SanitizeBoxName(CamfrogAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var base_name = new string(account.Username.Where(char.IsLetterOrDigit).ToArray());
+        if (base_name.Length > 32)
+            base_name = base_name.Substring(0, 32);
+        if (string.IsNullOrEmpty(base_name))
+            base_name = "account" + account.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return base_name;
+    }
+
+    public static string? FindSandboxieStart()
+    {
+        string[] candidates =
+        [
+            @"C:\Program Files\Sandboxie-Plus\Start.exe",
+            @"C:\Program Files (x86)\Sandboxie\Start.exe",
+        ];
+        foreach (var candidate in candidates)
+        {
+            try { if (File.Exists(candidate)) return candidate; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return null;
+    }
+
+    public const string SandboxieReleasesUrl = "https://github.com/sandboxie-plus/Sandboxie/releases";
+    public const string SandboxieRepository = "https://github.com/sandboxie-plus/Sandboxie";
+
+    public static string? GetSandboxieVersion(string? startExePath)
+    {
+        if (string.IsNullOrWhiteSpace(startExePath))
+            return null;
+        try
+        {
+            if (!File.Exists(startExePath))
+                return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(startExePath);
+            var version = info.ProductVersion ?? info.FileVersion;
+            return string.IsNullOrWhiteSpace(version) ? null : version.Trim();
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
+    public static string GetBoxesRoot()
+    {
+        // Overridable for tests; default matches Sandboxie-Plus per-user layout.
+        var overrideRoot = Environment.GetEnvironmentVariable("CAMFROGMULTIID_SANDBOX_ROOT");
+        if (!string.IsNullOrWhiteSpace(overrideRoot))
+            return overrideRoot;
+        return Path.Combine(
+            Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.System)) ?? "C:\\",
+            "Sandbox",
+            Environment.UserName);
+    }
+
+    public static bool BoxExists(string boxName)
+    {
+        if (string.IsNullOrWhiteSpace(boxName))
+            return false;
+        try { return Directory.Exists(Path.Combine(GetBoxesRoot(), boxName)); }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
+    public static string BuildCreateBoxArguments(string boxName) =>
+        $"/Box:{Quote(boxName)} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+
+    public static void CreateBox(string startExe, string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        if (!File.Exists(startExe))
+            throw new FileNotFoundException("Sandboxie Start.exe was not found.", startExe);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = startExe,
+            Arguments = BuildCreateBoxArguments(boxName),
+            UseShellExecute = false,
+            CreateNoWindow = true
+        }) ?? throw new InvalidOperationException("Could not start Sandboxie Start.exe.");
+        // cmd /c exit terminates immediately; the box persists afterwards.
+        if (!process.WaitForExit(30000))
+            throw new TimeoutException($"Timed out creating Sandboxie box '{boxName}'.");
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}.");
+    }
+
+    public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)
+    {
+        var warnings = new List<string>();
+        if (string.IsNullOrWhiteSpace(template))
+            return warnings;
+        // Detect likely-unintended curly-brace tokens other than the two supported placeholders.
+        var i = 0;
+        while (i < template.Length)
+        {
+            var open = template.IndexOf('{', i);
+            if (open < 0)
+                break;
+            var close = template.IndexOf('}', open + 1);
+            if (close < 0)
+            {
+                warnings.Add("Unclosed '{' in arguments template.");
+                break;
+            }
+            var token = template.Substring(open, close - open + 1);
+            if (!string.Equals(token, "{username}", StringComparison.Ordinal) &&
+                !string.Equals(token, "{profile}", StringComparison.Ordinal))
+            {
+                warnings.Add($"Unsupported placeholder '{token}'. Supported: {{username}}, {{profile}}.");
+            }
+            i = close + 1;
+        }
+        return warnings;
+    }
+
+    private static string ExpandArguments(string? template, CamfrogAccount account) =>
         (template ?? string.Empty)
             .Replace("{username}", Quote(account.Username), StringComparison.Ordinal)
             .Replace("{profile}", Quote(account.ProfileDirectory), StringComparison.Ordinal);
 
     private static string Quote(string value)
     {
+        // Windows command-line quoting: escape quotes and only the backslashes
+        // that immediately precede a quote or the closing quote.
         var sb = new StringBuilder(value.Length + 2);
         sb.Append('"');
         var slashes = 0;

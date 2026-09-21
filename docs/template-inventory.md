@@ -1,57 +1,44 @@
-# Repository Engineering Inventory
+# Project Inventory — Camfrog Multi-ID Manager
 
-This document records the engineering and GitHub controls that are actually enabled for Camfrog Multi-ID Manager.
+This document replaces the generic template inventory and reflects the current repository state.
 
-## Project documentation
+## Solution
 
-- README.md — user-facing build, runtime, troubleshooting, and production validation guide.
-- ABOUT.md — project scope and engineering focus.
-- AGENTS.md — repository automation/engineering contract.
-- CONTRIBUTING.md — contribution and validation workflow.
-- SECURITY.md — vulnerability reporting and security requirements.
-- GOVERNANCE.md — project decision and maintenance model.
-- CODE_OF_CONDUCT.md — community standards.
-- CHANGELOG.md — release history.
-- ROADMAP.md — completed work and planned improvements.
-- IMPLEMENTATION-CHECKLIST.md — production readiness tracking.
+- `CamfrogMultiID.sln` (projects: Core, Infrastructure, App, Tests)
 
-## GitHub community and ownership
+## Source
 
-- .github/CODEOWNERS
-- .github/PULL_REQUEST_TEMPLATE.md
-- .github/SUPPORT.md
-- .github/ISSUE_TEMPLATE/bug_report.yml
-- .github/ISSUE_TEMPLATE/feature_request.yml
-- .github/ISSUE_TEMPLATE/security.yml
-- .github/ISSUE_TEMPLATE/config.yml
-- .github/release.yml
+- `src/CamfrogMultiID.Core/` — domain models (`CamfrogAccount`, `AppSettings`)
+- `src/CamfrogMultiID.Infrastructure/` — `AppPaths`, `DatabaseService`, `CredentialService`, `SettingsService`, `ProcessSessionService` (SQLite + DPAPI + Process)
+- `src/CamfrogMultiID.App/` — WPF (`App.xaml`, `MainWindow`, `AccountWindow`, `SettingsWindow`, `app.manifest`)
+- `tests/CamfrogMultiID.Tests/` — xUnit coverage for all layers
 
-## CI and security automation
+## Build and release
 
-- .github/workflows/ci.yml — Windows build/test/publish plus repository checks.
-- .github/workflows/codeql.yml — C# and GitHub Actions analysis.
-- .github/workflows/dependency-review.yml — pull-request dependency review.
-- .github/workflows/release.yml — tagged Windows release packaging.
-- .github/dependabot.yml — GitHub Actions and NuGet updates.
-- .github/codeql-config.yml — extended CodeQL query configuration.
+- `build-release.ps1` / `build-release.cmd` — deterministic restore → build → publish `win-x64` self-contained
+- `Directory.Build.props`, `.editorconfig`, `Makefile` (dotnet targets)
 
-## Build and test tooling
+## CI/CD
 
-- CamfrogMultiID.sln
-- Directory.Build.props
-- build-release.ps1
-- build-release.cmd
-- Makefile
-- tests/CamfrogMultiID.Tests
-- scripts/bootstrap-ubuntu-mingw-wine-vcpkg.sh
-- toolchain-x86_64-w64-mingw32.cmake
+- `.github/workflows/ci.yml` — windows-latest .NET 8 build matrix (restore, Debug, Release, test, publish) + ubuntu baseline
+- `.github/workflows/codeql.yml` — CodeQL for `csharp` and `actions` (security-extended)
+- `.github/workflows/dependency-review.yml` — PR dependency review
+- `.github/dependabot.yml` — `github-actions` + `nuget` + `docker`
+- `.github/codeql-config.yml` — security-extended queries
 
-## Intentionally absent
+## Governance and docs
 
-- Dockerfile: not applicable to the supported WPF desktop runtime.
-- Container deployment manifests: not applicable to the current application architecture.
-- Funding configuration: no project funding program is currently enabled.
+- `README.md` — production build baseline, security boundary, publish procedure
+- `ABOUT.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `SECURITY.md`
+- `CHANGELOG.md`, `ROADMAP.md`, `IMPLEMENTATION-CHECKLIST.md`
+- `docs/architecture.md`, `docs/development.md`, `docs/release.md`, `docs/adr/`
 
-## Validation principle
+## Configuration
 
-The inventory must describe files and workflows that exist in this repository. Generic template placeholders and stale adoption instructions should not remain in project documentation.
+- `.gitignore` — .NET artifacts (`bin/`, `obj/`, `.vs/`, `TestResults/`, `publish/`) + secrets
+- `.gitattributes` — `text=auto eol=lf`, binaries
+- `Dockerfile` — documents Windows-only (not supported in Linux container)
+
+## Scripts
+
+- `run-diagnostic.cmd` — verifies publish and process liveness

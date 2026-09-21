@@ -8,6 +8,7 @@
 # .NET build artifacts
 bin/
 obj/
+*_wpftmp.csproj
 out/
 publish/
 artifacts/
@@ -19,17 +20,16 @@ coverage/
 *.nupkg
 *.snupkg
 
-# Dependencies
+# Dependencies (if any auxiliary tooling)
 node_modules/
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 
-# Build output
+# Build output (generic)
 dist/
 build/
-coverage/
 .next/
 .nuxt/
 .out/
@@ -61,3 +61,9 @@ logs/
 # Local runtime data
 .tmp/
 tmp/
+
+# Camfrog runtime data (local only, never commit)
+CamfrogMultiID/
+*.db
+*.db-shm
+*.db-wal

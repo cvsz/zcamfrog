@@ -1,48 +1,73 @@
-# Architecture
+# Architecture — Camfrog Multi-ID Manager
 
 ## System context
+Windows WPF desktop application (`.NET 8`, `net8.0-windows`, `win-x64` self-contained) that manages multiple local Camfrog client processes. Each managed identity has a discrete profile directory, DPAPI-protected credential file, and isolated process lifetime. The manager does not bypass Camfrog authentication, CAPTCHA, or licensing and does not auto-inject credentials.
 
-Camfrog Multi-ID Manager is a Windows WPF desktop application that launches locally installed Camfrog client processes. It does not implement Camfrog authentication or bypass CAPTCHA, licensing, rate limits, or access controls.
+## Components and responsibilities
 
-## Components
+### CamfrogMultiID.Core (`src/CamfrogMultiID.Core`)
+- Domain models: `CamfrogAccount`, `AppSettings`.
+- No dependencies on UI, persistence, or OS integration. Pure data contracts and validation.
 
-- **App** — WPF startup, single-instance enforcement, dependency initialization, and global exception handling.
-- **Core** — account and settings models.
-- **Infrastructure** — SQLite persistence, DPAPI credential storage, settings persistence, process lifecycle and identity validation.
-- **UI** — account management, settings, process controls, runtime reconciliation, and log viewer.
+### CamfrogMultiID.Infrastructure (`src/CamfrogMultiID.Infrastructure`)
+- `AppPaths`: deterministic paths under `%LOCALAPPDATA%\CamfrogMultiID` (`camfrog.db`, `profiles/`, `secrets/`, `logs/`, `settings.json`). Supports injected root for testing.
+- `DatabaseService`: SQLite (`Microsoft.Data.Sqlite`) with `busy_timeout=5000`, `foreign_keys=ON`, WAL-friendly, case-insensitive `username` uniqueness (`COLLATE NOCASE`), `secret_name` uniqueness, transactions, parameterized queries, bounded lock (`_gate`), migration for `process_executable_path`, disposal-safe connections/commands, best-effort event logging.
+- `CredentialService`: Windows DPAPI `CurrentUser` (`ProtectedData`), atomic temp-file writes, zero-memory cleanup for plaintext and protected bytes, no plaintext on disk, fail-safe on corrupt data (throws, caller handles).
+- `SettingsService`: JSON (`System.Text.Json`) persistence for `ClientExecutable` and `ClientArgumentsTemplate`, atomic temp-file write, tolerant load (missing/corrupt → defaults), `DataDirectory` always set to `AppPaths.Root`.
+- `ProcessSessionService`: process lifecycle with PID validation, start-time and executable-path identity, stale-PID/reuse protection (fail-closed), graceful `CloseMainWindow` → bounded wait (5s) → `Kill(entireProcessTree:true)`, duplicate-instance guard, working-directory isolation, Windows command-line quoting for `{username}`/`{profile}` placeholders.
 
-## Persistence
+### CamfrogMultiID.App (`src/CamfrogMultiID.App`)
+- WPF UI: `App.xaml`, `MainWindow`, `AccountWindow`, `SettingsWindow`, `app.manifest` (`asInvoker`).
+- `App.xaml.cs`: single-instance mutex (`Local\CamfrogMultiID.Manager`), guarded `OnStartup` (no static initialization before `OnStartup`), `Db.Initialize`, emergency log at `startup-error.log`, dispatcher/AppDomain/unobserved-task diagnostics, clean `OnExit` mutex release.
+- `MainWindow`: polling reconciler (`DispatcherTimer` 2s) calling `IsTrackedProcessAlive`, DB/UI refresh non-reentrant, log viewer tolerant to I/O failures.
+- `AccountWindow`: validation (username required, password required, case-insensitive duplicate), profile/secret creation with rollback on DB failure, DPAPI save before DB insert.
+- `SettingsWindow`: executable browse, existence validation, argument template support (`{username}`, `{profile}` only).
 
-Data is stored below `%LOCALAPPDATA%\\CamfrogMultiID`:
+### CamfrogMultiID.Tests (`tests/CamfrogMultiID.Tests`)
+- xUnit, `net8.0-windows`, covers DatabaseService, CredentialService, SettingsService, ProcessSessionService (identity, quoting, start/stop, stale PID).
 
-- `camfrog.db` — account/runtime/event metadata.
-- `settings.json` — client executable and documented argument template.
-- `profiles\\` — per-account profile directories.
-- `secrets\\` — DPAPI-protected credential blobs.
-- `logs\\` — operational logs with bounded rotation.
+## Data/storage model
+```
+%LOCALAPPDATA%\CamfrogMultiID\
+  camfrog.db          # SQLite: accounts, events
+  settings.json       # AppSettings
+  profiles\<guid>\    # per-account profile directory
+  secrets\<name>.bin  # DPAPI blobs
+  logs\app.log        # rotated at ~5 MiB → app.log.1
+  startup-error.log   # emergency startup failures
+```
+- SQLite schema: `accounts(id PK, display_name, username, secret_name UNIQUE, profile_directory, enabled, status, process_id, started_utc, process_executable_path, last_error)` + unique index `ux_accounts_username` (`COLLATE NOCASE`) + `events`.
+- Secrets never in SQLite, never in logs, never in command-line.
 
-SQLite uses WAL mode, a busy timeout, foreign-key enforcement, and case-insensitive username uniqueness.
+## External integrations
+- Local filesystem, SQLite, Windows DPAPI, `System.Diagnostics.Process`, Win32 `MainModule`, `CloseMainWindow`.
+- No network, no cloud, no auto-update.
 
-## Process lifecycle and trust boundary
+## Authentication and authorization
+- Credentials stored via DPAPI `CurrentUser`; only the same Windows user can decrypt.
+- No elevation; `asInvoker`.
+- Single-instance mutex prevents concurrent managers.
 
-The configured executable path is resolved to a full local path before launch. A managed process is identified by PID plus recorded start time and executable path.
+## Trust boundaries
+- Untrusted: user-supplied `ClientExecutable`, `ClientArgumentsTemplate`, `Username`, `ProfileDirectory`.
+- Validation: executable must exist (`File.Exists` after `Path.GetFullPath`), template limited to two placeholders, arguments quoted, profile directory created under controlled root, username uniqueness enforced.
 
-Termination is fail-closed: if start time or executable identity cannot be verified, the manager refuses to kill the PID. Windows exposes process start time and main-module information through APIs that can throw when process state or access is unavailable, so treating an inspection failure as a match would be unsafe. citeturn2search0turn2search3
-
-## Credential security
-
-Passwords are encrypted with Windows DPAPI using `DataProtectionScope.CurrentUser` and are never written to SQLite. Temporary secret files are deleted after replacement or failure.
-
-## Deployment
-
-The supported runtime is Windows x64 with .NET 8 or a newer SDK capable of targeting `net8.0-windows`. Production artifacts are self-contained single-file x64 publishes.
+## Deployment topology
+- Self-contained `win-x64`, single-file `CamfrogMultiID.exe` (see `build-release.ps1`).
+- No container, no service, no installer; copy to Windows x64 and run.
 
 ## Observability
+- DB `events` + text log, startup log, UI log viewer, process start/stop logs with PID and reason, failure logs with sanitized messages.
 
-Application events are written to SQLite and a text log. The text log is rotated at approximately 5 MiB. Startup failures also have an emergency log path.
+## Availability and recovery
+- DB best-effort logging never crashes manager, atomic writes, rollback on account creation failure, graceful process termination with timeouts, stale-PID detection, crash recovery via reconciler.
+
+## Security considerations
+- DPAPI scope `CurrentUser`, zero-memory, no plaintext persistence, parameterized SQL, path canonicalization, process identity validation, fail-closed on reuse, least-privilege workflows, dependency review, CodeQL `csharp`.
 
 ## Known constraints
+- Client may ignore `{profile}`; then instances share state.
+- Password not auto-injected.
+- Requires Windows, .NET 8, `%LOCALAPPDATA%` writable.
 
-- Camfrog behavior around multiple concurrent local instances and profile isolation depends on the installed Camfrog client.
-- The manager does not automatically submit stored passwords to Camfrog.
-- The argument template is limited to `{username}` and `{profile}` substitutions.
+Record material decisions as ADRs under `docs/adr/`.

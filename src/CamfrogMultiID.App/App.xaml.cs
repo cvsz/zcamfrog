@@ -60,6 +60,7 @@ public partial class App : Application
             Credentials = new CredentialService(Paths);
             Settings = new SettingsService(Paths);
             Sessions = new ProcessSessionService(Db);
+            ApplyLanguage(Settings.Load().Language);
 
             Db.Initialize();
             Db.Log("INFO", $"Application starting. PID={Environment.ProcessId}");
@@ -103,6 +104,14 @@ public partial class App : Application
         }
 
         base.OnExit(e);
+    }
+
+    public static void ApplyLanguage(string? language)
+    {
+        var culture = new System.Globalization.CultureInfo(
+            string.Equals(language, "th", StringComparison.OrdinalIgnoreCase) ? "th" : "en");
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
+        Thread.CurrentThread.CurrentUICulture = culture;
     }
 
     private static string EmergencyLogPath()

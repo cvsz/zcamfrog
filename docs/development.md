@@ -1,71 +1,59 @@
-# Development
+# Development — Camfrog Multi-ID Manager
 
-## Requirements
+## Prerequisites
+- Windows 10/11 x64
+- .NET SDK 8.0.425+ (`dotnet --info` should show `8.0.4xx` and `Microsoft.WindowsDesktop.App 8.0.x`)
+- No admin required; WPF builds need Windows desktop workload (included in .NET 8 SDK).
 
-- Windows 10/11 x64 for the WPF application.
-- .NET 8 SDK or newer SDK capable of targeting `net8.0-windows`.
-- Git.
-- PowerShell 7 recommended for release automation.
-- Ubuntu 24.04 LTS is the supported host for the optional MinGW/Wine/vcpkg native helper toolchain.
-
-## Build and test on Windows
-
+## Local setup
 ```powershell
-dotnet restore .\CamfrogMultiID.sln
-dotnet build .\CamfrogMultiID.sln -c Release --no-restore
-dotnet test .\tests\CamfrogMultiID.Tests\CamfrogMultiID.Tests.csproj -c Release --no-restore
+git clone https://github.com/cvsz/zcamfrog.git
+cd zcamfrog
+dotnet --info
+dotnet restore CamfrogMultiID.sln
+dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64
 ```
 
-Run locally:
-
+## Quality gates (must pass before PR)
 ```powershell
-dotnet run --project .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release
+dotnet build CamfrogMultiID.sln -c Debug --no-restore
+dotnet build CamfrogMultiID.sln -c Release --no-restore
+# fallback if solution restore was incomplete:
+dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore
+dotnet test CamfrogMultiID.sln -c Release --no-build --verbosity normal
 ```
 
-Production publish:
-
+## Publish (production artifact)
 ```powershell
 .\build-release.ps1
+# or
+.\build-release.cmd
+```
+Output: `src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/CamfrogMultiID.exe` (self-contained, single-file).
+
+## Diagnostic run
+```powershell
+.\run-diagnostic.cmd
+# checks that publish exists and process stays alive; logs at %LOCALAPPDATA%\CamfrogMultiID\
 ```
 
-## Optional Ubuntu native-toolchain setup
+## Formatting and analyzers
+- `Directory.Build.props` enables `EnableNETAnalyzers`, `AnalysisLevel latest-recommended`, `Deterministic`, `ContinuousIntegrationBuild`.
+- All projects use `TreatWarningsAsErrors=true`, `Nullable=enable`, `ImplicitUsings=enable`.
+- Use modern APIs: `ArgumentNullException.ThrowIfNull`, `ArgumentException.ThrowIfNullOrWhiteSpace`, `ArgumentOutOfRangeException.ThrowIfNegativeOrZero` where applicable.
 
-The repository includes:
+## Testing
+- `tests/CamfrogMultiID.Tests` (xUnit, net8.0-windows) covers database, credentials (DPAPI), settings, process identity, quoting, concurrency.
+- Tests use isolated temp roots via `new AppPaths(Path.GetTempPath()+Guid)`; no pollution of real `%LOCALAPPDATA%`.
+- Run: `dotnet test -c Release`
 
-```bash
-bash scripts/bootstrap-ubuntu-mingw-wine-vcpkg.sh
-```
+## Troubleshooting
+- `NETSDK1004: project.assets.json not found` → run the two-step restore above (solution + win-x64 graph). `build-release.ps1` does this automatically.
+- WPF window not showing → check `%LOCALAPPDATA%\CamfrogMultiID\startup-error.log` and `logs\app.log`; verify `<InvariantGlobalization>false` (required for WPF).
 
-This installs MinGW-w64, Wine, vcpkg, and generates `toolchain-x86_64-w64-mingw32.cmake`.
+## Documentation
+Update `docs/architecture.md`, `docs/development.md`, `docs/release.md`, and `README.md` when behavior changes. Record decisions in `docs/adr/`.
 
-Use it only for native helper components or native Windows tests. A MinGW build cannot replace the supported .NET WPF production build.
-
-Example native CMake configure:
-
-```bash
-cmake -S . -B build-mingw -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$PWD/toolchain-x86_64-w64-mingw32.cmake" \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build build-mingw
-```
-
-## Quality gates
-
-Before opening a pull request:
-
-1. Build Release with warnings treated as errors.
-2. Run regression tests.
-3. Run `dotnet format .\CamfrogMultiID.sln --verify-no-changes --no-restore`.
-4. Run repository security marker checks.
-5. Confirm no secrets or local profile/database artifacts are tracked.
-6. Review process lifecycle changes for PID reuse and fail-closed behavior.
-
-## Testing strategy
-
-Infrastructure tests cover case-insensitive username uniqueness, DPAPI credential round trips, settings normalization/persistence, and deletion safety for running accounts.
-
-Changes to process identity or termination must add regression coverage where practical and must never weaken identity checks just to make tests pass.
-
-## Test limitations
-
-Interactive WPF behavior and the proprietary Camfrog client's actual profile-isolation behavior require Windows/manual validation. CI verifies buildable/publishable artifacts and automated infrastructure tests; it does not prove every Camfrog client version honors every optional argument.
+## Security
+- Do not commit secrets, do not log plaintext passwords, do not put secrets in `settings.json` or command-line.
+- Keep CodeQL and dependency-review enabled.

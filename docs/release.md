@@ -1,43 +1,41 @@
-# Release
+# Release — Camfrog Multi-ID Manager
 
 ## Versioning
-
-Use Semantic Versioning for tagged releases such as `v1.0.0`.
+Semantic Versioning (`MAJOR.MINOR.PATCH`). Tag releases as `vX.Y.Z` (e.g., `v1.0.0`). Changelog in `CHANGELOG.md`.
 
 ## Pre-release checklist
+1. `dotnet restore` (solution + `src/CamfrogMultiID.App --force-evaluate -r win-x64`)
+2. `dotnet build CamfrogMultiID.sln -c Release --no-restore` (0 warnings, 0 errors)
+3. `dotnet test CamfrogMultiID.sln -c Release --no-build` (39 tests pass)
+4. `.\build-release.ps1` (publish `win-x64` self-contained, `PublishSingleFile=true`)
+5. Verify publish: `src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/CamfrogMultiID.exe` exists; size reasonable; SHA256 recorded; no secrets/source in artifact.
+6. Manual smoke on clean Windows: start exe, settings, add one account, start/stop, duplicate username rejected, PID reuse not killed, DPAPI isolation, no plaintext in logs.
+7. CI green: `CI` (build windows-latest), `CodeQL` (csharp+actions), `Dependency Review`.
+8. Update `CHANGELOG.md` and `ROADMAP.md`.
 
-1. Ensure the PR is merged to `main`.
-2. Ensure Windows CI build and tests pass.
-3. Ensure CodeQL and dependency review pass.
-4. Review `CHANGELOG.md`.
-5. Run `.\build-release.ps1` on a clean Windows environment.
-6. Verify `CamfrogMultiID.exe` exists in the self-contained x64 publish directory.
-7. Test first-run settings, account creation, start/stop, reconciliation, and removal.
-8. Confirm logs contain no plaintext passwords.
-9. Confirm the exact Camfrog client version intended for the release has been manually validated.
+## Publish
+```powershell
+.\build-release.ps1
+# output: src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/
+Get-FileHash src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/CamfrogMultiID.exe -Algorithm SHA256
+```
 
-## Automated tagged release
+Artifact contains:
+- `CamfrogMultiID.exe` (single-file)
+- Runtime and native assets (self-contained)
+- No `.pdb` policy: pdbs not shipped (deterministic build)
 
-Push a version tag:
-
+## Release creation
 ```powershell
 git tag v1.0.0
 git push origin v1.0.0
+# GitHub release via workflow or manual: attach ZIP of publish folder + SHA256 + notes from CHANGELOG
 ```
 
-GitHub Actions `.github/workflows/release.yml` then:
-
-1. Checks out the tagged commit.
-2. Installs .NET 8.
-3. Restores and builds the solution.
-4. Runs regression tests.
-5. Executes `build-release.ps1`.
-6. Packages the self-contained publish directory as `CamfrogMultiID-vX.Y.Z-win-x64.zip`.
-7. Generates a SHA-256 checksum.
-8. Creates the GitHub Release and uploads the ZIP and checksum.
-
-The release workflow must use the exact tag commit; it must never package uncommitted workspace state.
-
 ## Rollback
+- Re-tag previous `vX.Y.Z` or re-publish previous commit's artifact.
+- No DB migrations to revert (SQLite additive); if schema changes, document downgrade path.
+- Invalidate compromised artifacts, rotate DPAPI secrets if needed (re-enter passwords).
 
-Keep the previous known-good release artifact. If a release is defective, stop using the affected binary, restore the previous release, and preserve diagnostics for remediation. Database migrations should not be manually reverted without a tested migration plan.
+## Verification after publication
+- Download artifact on clean machine, run, check version, check logs.

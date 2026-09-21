@@ -1,27 +1,36 @@
-# Roadmap
+# Roadmap — Camfrog Multi-ID Manager
 
-## Completed
+## Current (v1.0)
+- [x] WPF `net8.0-windows` `win-x64` self-contained, single-file
+- [x] SQLite with case-insensitive username uniqueness, DPAPI secrets, atomic writes
+- [x] Process isolation with PID/start-time/executable validation, fail-closed reuse protection
+- [x] Single-instance mutex, startup diagnostics, reconciler, log rotation
+- [x] Build: `build-release.ps1` deterministic, CI on `windows-latest`, CodeQL `csharp`, 39 tests
+- [x] Docs: architecture, development, release synchronized
 
-- [x] .NET 8 WPF application baseline
-- [x] SQLite persistence with WAL, busy timeout, foreign-key enforcement, and case-insensitive username uniqueness
-- [x] DPAPI CurrentUser credential storage
-- [x] Single-instance startup handling
-- [x] PID/start-time/executable identity tracking
-- [x] Fail-closed process termination
-- [x] Runtime reconciliation
-- [x] Add, start, stop, start-all, stop-all, and remove-account workflows
-- [x] Self-contained win-x64 publishing
-- [x] Regression tests
-- [x] Windows CI build/test/publish gate
-- [x] C# and GitHub Actions CodeQL analysis
-- [x] Dependency review and Dependabot automation
+## Next
+- [x] UI: edit/delete account, enable/disable, search/filter
+- [x] UI: per-account launch arguments preview and validation
+- [x] UI: selected-account details, status bar, log filter, context menu + shortcuts, change password, clear error
+- [x] Process: auto-restart on crash (opt-in, 3-per-10-min loop guard), health via details + status bar
+- [x] Persistence: backup/restore of `camfrog.db` and `secrets/` (traversal-safe zip, `VACUUM INTO` snapshot)
+- [x] Security: secrets-dir ACL (current user only), audit via event log + log export
+- [x] Accessibility: screen-reader names on main controls, full keyboard operation
+- [x] Provenance: `attest-build-provenance` on release zips (verifies on first tag release)
+- [x] Diagnostics: opt-in local bundle (versions, counts, log, settings; no secrets/usernames, no network)
+- [x] Health: uptime + restart counts surfaced; password-age rotation notice
+- [x] Scheduled backups with pruning
+- [~] Installer: `package-msix.ps1` path-ready (needs Windows SDK + cert; unverified here, zip stays primary)
+- [ ] Telemetry: networked opt-in diagnostics (no discretionary need while local bundle exists)
+- [x] Localization: English + Thai via resx, language setting with restart notice, completeness test over all keys
 
-## Next improvements
+## Future considerations
+- [ ] Support for Camfrog client variants (if documented CLI changes)
+- [ ] Localization (resources)
+- [ ] Accessibility audit and keyboard navigation improvements
+- [ ] Signed artifacts and provenance (Sigstore)
 
-- [ ] Account editing with credential rotation and profile reset controls.
-- [ ] Richer process diagnostics and per-account lifecycle history.
-- [ ] Signed release artifacts and provenance attestations.
-- [ ] UI smoke tests on a Windows runner where interactive WPF execution is supported.
-- [ ] Validate profile isolation against each supported Camfrog client version.
-- [ ] Add automated validation for the Ubuntu MinGW/Wine/vcpkg helper toolchain.
-- [ ] Add release artifact checksums and documented verification instructions.
+## Non-goals
+- No bypass of Camfrog auth/CAPTCHA/licensing.
+- No network service, no cloud sync.
+- No Linux/macOS support (WPF Windows-only).

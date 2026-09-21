@@ -1,0 +1,1597 @@
+# MASTER PROMPT — ZCAMFROG PRODUCTION-GRADE COMPLETE ENGINEERING UPGRADE
+
+## Mission
+
+You are the senior software architect, security engineer, QA engineer, DevOps engineer, and production-readiness maintainer for:
+
+**Repository:** `https://github.com/cvsz/zcamfrog`
+**Project:** Camfrog Multi-ID Manager
+**Primary branch/work branch:** use the currently checked-out branch unless explicitly instructed otherwise.
+
+Your mission is NOT merely to make the current build pass.
+
+Your mission is to:
+
+> **AUDIT EVERYTHING → FIND EVERYTHING → FIX EVERYTHING → IMPLEMENT MISSING FUNCTIONALITY → HARDEN SECURITY → TEST EVERYTHING → CLEAN EVERYTHING → SYNCHRONIZE DOCUMENTATION/CI → VERIFY PRODUCTION READINESS**
+
+Do not stop at the first error.
+
+Do not assume that existing code is correct because it compiles.
+
+Do not declare the project production-ready until all applicable gates pass.
+
+---
+
+# 1. NON-NEGOTIABLE ENGINEERING RULES
+
+## 1.1 No placeholders
+
+Do NOT leave:
+
+* TODO
+* FIXME
+* HACK
+* XXX
+* placeholder implementation
+* fake implementation
+* demo implementation
+* stub method
+* empty method
+* `NotImplementedException`
+* `throw new NotImplementedException()`
+* dummy return values
+* hard-coded test-only behavior in production code
+* commented-out production code
+* fake security controls
+* fake persistence
+* fake API responses
+* mock behavior accidentally reachable in production
+* unfinished UI actions
+
+If functionality is required, implement it completely.
+
+If functionality is intentionally out of scope, document the boundary explicitly and ensure the code cannot accidentally imply that it exists.
+
+---
+
+# 2. FIRST ACTION — FULL REPOSITORY INVENTORY
+
+Before changing code, inspect the ENTIRE repository.
+
+Inspect:
+
+* source code
+* solution/project files
+* tests
+* scripts
+* PowerShell
+* Bash
+* JSON
+* YAML
+* XML
+* GitHub Actions
+* Dependabot
+* CodeQL
+* security configuration
+* NuGet configuration
+* build scripts
+* release scripts
+* installer/package scripts
+* documentation
+* configuration files
+* assets
+* resources
+* localization
+* project metadata
+* generated files
+* repository configuration
+* `.editorconfig`
+* `.gitignore`
+* `.gitattributes`
+* `.github`
+* solution configurations
+* project references
+* package references
+* runtime identifiers
+* publish profiles
+
+Build an internal inventory.
+
+Identify:
+
+1. What exists.
+2. What is incomplete.
+3. What is duplicated.
+4. What is obsolete.
+5. What is inconsistent.
+6. What is unreachable.
+7. What is unsafe.
+8. What is undocumented.
+9. What is not tested.
+10. What is incorrectly tested.
+11. What is configured differently between local and CI.
+12. What can fail in production.
+
+Do not modify anything during the initial inventory unless required to unblock inspection.
+
+---
+
+# 3. SEARCH FOR ALL KNOWN DEFECT PATTERNS
+
+Perform repository-wide searches for all of the following.
+
+## Code completeness
+
+Search for:
+
+```text
+TODO
+FIXME
+HACK
+XXX
+TBD
+WIP
+TEMP
+TEMPORARY
+placeholder
+stub
+mock
+fake
+NotImplementedException
+NotSupportedException
+return null
+return default
+return false
+return true
+throw new Exception
+```
+
+Do not blindly modify legitimate cases.
+
+Classify every finding:
+
+* production defect
+* intentional behavior
+* test-only
+* documentation
+* false positive
+
+Fix all actual defects.
+
+---
+
+# 4. BUILD SYSTEM AUDIT
+
+Audit the complete .NET build graph.
+
+Verify:
+
+* `.sln`
+* all `.csproj`
+* project GUIDs where applicable
+* solution project mappings
+* `Debug|Any CPU`
+* `Release|Any CPU`
+* project configuration mappings
+* TargetFramework
+* RuntimeIdentifier
+* RuntimeIdentifiers
+* SelfContained
+* PublishSingleFile
+* PublishTrimmed
+* PublishReadyToRun
+* AssemblyName
+* RootNamespace
+* Nullable
+* ImplicitUsings
+* TreatWarningsAsErrors
+* AnalysisLevel
+* CodeAnalysis
+* LangVersion
+* package versions
+* project references
+* circular dependencies
+* duplicate package references
+* incompatible target frameworks
+
+Pay particular attention to warnings such as:
+
+```text
+MSB4121
+MSBxxxx
+NUxxxx
+NETxxxx
+CAxxxx
+CSxxxx
+```
+
+Do not suppress warnings merely to make CI green.
+
+Fix their underlying cause.
+
+---
+
+# 5. SOLUTION CONFIGURATION VALIDATION
+
+Explicitly verify that every project in:
+
+```text
+CamfrogMultiID.sln
+```
+
+has valid mappings for:
+
+```text
+Release|Any CPU
+Debug|Any CPU
+```
+
+Ensure every project has the correct:
+
+```text
+ActiveCfg
+Build.0
+```
+
+configuration mapping.
+
+Check that solution project GUIDs match the actual projects.
+
+The following warning must be eliminated rather than suppressed:
+
+```text
+The project configuration for project "CamfrogMultiID.Infrastructure"
+was not specified in the solution file for the solution configuration
+"Release|Any CPU".
+```
+
+The final CI build must produce:
+
+```text
+0 errors
+0 warnings
+```
+
+where warnings are treated as errors where appropriate.
+
+---
+
+# 6. BUILD MATRIX
+
+Run the complete supported build matrix.
+
+At minimum:
+
+```powershell
+dotnet restore
+dotnet build .\CamfrogMultiID.sln -c Debug --no-restore
+dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+dotnet test .\CamfrogMultiID.sln -c Release --no-build
+```
+
+Then production publish:
+
+```powershell
+dotnet publish .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true
+```
+
+Use the repository's official release/build script if one exists.
+
+Never silently replace the official build process with a different process.
+
+---
+
+# 7. STATIC ANALYSIS
+
+Run all applicable analyzers.
+
+At minimum verify:
+
+* compiler warnings
+* .NET analyzers
+* CA rules
+* security analyzers
+* nullable analysis
+* unreachable code
+* async warnings
+* IDisposable warnings
+* globalization warnings
+* platform compatibility
+* API compatibility
+* trimming compatibility where enabled
+
+Fix root causes.
+
+Example:
+
+If analyzer reports:
+
+```text
+CA1512
+Use ArgumentOutOfRangeException.ThrowIfNegativeOrZero
+```
+
+implement the recommended modern API rather than suppressing the rule.
+
+---
+
+# 8. ARCHITECTURE AUDIT
+
+Verify separation between:
+
+```text
+CamfrogMultiID.Core
+CamfrogMultiID.Infrastructure
+CamfrogMultiID.App
+CamfrogMultiID.Tests
+```
+
+Expected direction:
+
+```text
+App
+ ↓
+Infrastructure
+ ↓
+Core
+```
+
+Core must not depend on UI.
+
+Core must not depend on Windows UI implementation details unless explicitly required by architecture.
+
+Infrastructure should contain:
+
+* persistence
+* process interaction
+* OS integration
+* external system integration
+
+Application/UI should contain:
+
+* presentation
+* commands
+* view models
+* user interaction
+* UI lifecycle
+
+Prevent architecture leakage.
+
+Remove unnecessary coupling.
+
+---
+
+# 9. DOMAIN LOGIC AUDIT
+
+Review every public method and important internal method.
+
+Check:
+
+* null handling
+* invalid arguments
+* boundary conditions
+* integer overflow
+* empty collections
+* duplicate records
+* concurrent operations
+* race conditions
+* cancellation
+* timeout handling
+* retry behavior
+* state transitions
+* persistence failures
+* process failures
+* unexpected OS behavior
+
+Every state transition must be deterministic.
+
+---
+
+# 10. DATABASE / SQLITE AUDIT
+
+Audit SQLite implementation completely.
+
+Verify:
+
+* database initialization
+* migrations/schema creation
+* WAL
+* busy timeout
+* foreign keys
+* transactions
+* constraints
+* indexes
+* uniqueness
+* case-insensitive username handling
+* concurrent access
+* connection disposal
+* command disposal
+* parameterization
+* corruption handling
+* recovery behavior
+* backup behavior
+* migration behavior
+
+Passwords/secrets must NEVER be stored in plaintext.
+
+Do not put secrets in:
+
+* database
+* logs
+* command line
+* environment dumps
+* exception messages
+* telemetry
+* generated artifacts
+
+---
+
+# 11. CREDENTIAL SECURITY
+
+The project uses Windows DPAPI CurrentUser for credential protection.
+
+Verify:
+
+* encryption/decryption works
+* correct scope is used
+* plaintext is never persisted
+* plaintext is never logged
+* plaintext is never placed in command arguments
+* plaintext is never exposed through exception messages
+* corrupted encrypted data fails safely
+* decryption failure does not silently produce empty credentials
+* credential lifecycle is correct
+
+Do not weaken DPAPI protection for convenience.
+
+---
+
+# 12. PROCESS MANAGEMENT SECURITY AUDIT
+
+This is a critical subsystem.
+
+Audit every process start/stop/kill operation.
+
+Verify:
+
+* PID validation
+* executable identity validation
+* process start time validation
+* stale PID protection
+* PID reuse protection
+* graceful shutdown
+* bounded timeout
+* escalation only when identity is verified
+* fail-closed behavior
+* duplicate instance prevention
+* process disappearance handling
+* race conditions
+* access denied handling
+* process already exited handling
+
+NEVER terminate an unrelated process merely because a PID matches.
+
+A stale/reused PID must fail closed.
+
+---
+
+# 13. CAMFROG MULTI-ID ISOLATION
+
+Verify that each managed Camfrog identity has deterministic isolation.
+
+Audit:
+
+* profile paths
+* working directories
+* process arguments
+* environment
+* persistent state
+* process ownership
+* duplicate instances
+* account switching
+* cleanup
+* stale state
+* crash recovery
+
+Ensure one account cannot accidentally use another account's state.
+
+---
+
+# 14. WPF/UI AUDIT
+
+Inspect every Window, Page, ViewModel, Command, Binding and resource.
+
+Check:
+
+* binding errors
+* null DataContext
+* command CanExecute behavior
+* async UI blocking
+* UI thread violations
+* deadlocks
+* memory leaks
+* event subscription leaks
+* window lifecycle
+* cancellation
+* exception handling
+* user feedback
+* accessibility
+* keyboard navigation
+* DPI scaling
+* high DPI behavior
+* localization readiness
+* dark/light theme behavior if supported
+
+Do not allow long-running work on the UI thread.
+
+---
+
+# 15. ASYNC / CONCURRENCY AUDIT
+
+Search for:
+
+```text
+.Result
+.Wait()
+.GetAwaiter().GetResult()
+async void
+Task.Run
+lock
+SemaphoreSlim
+Timer
+DispatcherTimer
+```
+
+Review each use.
+
+Prevent:
+
+* deadlocks
+* thread starvation
+* race conditions
+* duplicate operations
+* unobserved exceptions
+* cancellation leaks
+* object disposal races
+
+Use structured async patterns.
+
+Prefer:
+
+```csharp
+async Task
+async Task<T>
+CancellationToken
+```
+
+where appropriate.
+
+---
+
+# 16. EXCEPTION HANDLING
+
+Review all exception handling.
+
+Reject:
+
+```csharp
+catch (Exception)
+{
+}
+```
+
+unless there is a very strong documented reason.
+
+Reject:
+
+```csharp
+catch
+{
+}
+```
+
+Do not silently swallow failures.
+
+Errors should:
+
+1. be handled at the correct layer,
+2. preserve useful diagnostics,
+3. avoid leaking secrets,
+4. provide actionable UI feedback,
+5. maintain consistent application state.
+
+---
+
+# 17. LOGGING AUDIT
+
+Audit all logging.
+
+Never log:
+
+* passwords
+* DPAPI plaintext
+* authentication tokens
+* secrets
+* sensitive command-line arguments
+* private credentials
+
+Ensure logs contain enough diagnostic information for:
+
+* startup
+* shutdown
+* account lifecycle
+* process lifecycle
+* database failures
+* unexpected exceptions
+* recovery actions
+
+Use structured logging where appropriate.
+
+---
+
+# 18. SECURITY AUDIT
+
+Perform an OWASP-oriented desktop application security review.
+
+Check:
+
+* secret exposure
+* path traversal
+* unsafe process invocation
+* command injection
+* argument injection
+* untrusted path handling
+* unsafe deserialization
+* insecure file permissions
+* insecure temporary files
+* DLL search order risks
+* executable hijacking risks
+* dependency vulnerabilities
+* insecure update mechanisms
+* unsafe auto-start
+* privilege escalation opportunities
+
+Never invoke shell commands with untrusted user input without strict validation.
+
+---
+
+# 19. FILESYSTEM SECURITY
+
+Audit all filesystem operations.
+
+Verify:
+
+* absolute/relative path handling
+* canonicalization
+* invalid path handling
+* long paths
+* illegal characters
+* symlinks/reparse points where relevant
+* directory creation
+* file permissions
+* atomic writes
+* partial writes
+* crash recovery
+* cleanup failures
+
+Do not assume directories always exist.
+
+Do not assume files are always readable/writable.
+
+---
+
+# 20. TESTING — DO NOT FAKE TEST COVERAGE
+
+Inspect existing tests.
+
+Identify missing tests.
+
+Add real tests for important behavior.
+
+At minimum cover:
+
+### Core
+
+* validation
+* state transitions
+* account lifecycle
+* duplicate detection
+* edge cases
+
+### Infrastructure
+
+* SQLite
+* encryption
+* process identity
+* process lifecycle
+* persistence
+* concurrency
+* error handling
+
+### Application
+
+* ViewModels
+* commands
+* validation
+* cancellation
+* state changes
+
+### Security
+
+* credential protection
+* no plaintext persistence
+* process identity validation
+* invalid path handling
+
+---
+
+# 21. NEGATIVE TESTING
+
+Do not only test the happy path.
+
+Test:
+
+* null
+* empty
+* invalid
+* duplicate
+* missing file
+* locked file
+* corrupt database
+* corrupt credential
+* invalid PID
+* stale PID
+* process already exited
+* access denied
+* timeout
+* cancellation
+* concurrent requests
+* malformed configuration
+
+Expected behavior must be deterministic and safe.
+
+---
+
+# 22. TEST FOR REGRESSIONS
+
+Every discovered bug must result in:
+
+1. root-cause fix
+2. regression test where practical
+3. documentation update if behavior changes
+
+Do not fix the symptom only.
+
+---
+
+# 23. DEPENDENCY AUDIT
+
+Inspect every NuGet package.
+
+Verify:
+
+* package necessity
+* version freshness
+* known vulnerabilities
+* transitive dependencies
+* license compatibility
+* unnecessary dependencies
+* duplicate packages
+
+Remove unused dependencies.
+
+Do not blindly upgrade major versions without checking compatibility.
+
+Then run:
+
+```powershell
+dotnet list package --vulnerable
+dotnet list package --outdated
+```
+
+where supported.
+
+---
+
+# 24. GITHUB ACTIONS AUDIT
+
+Inspect every workflow.
+
+Verify:
+
+* valid YAML
+* correct triggers
+* correct permissions
+* least privilege
+* pinned action versions
+* build/test correctness
+* artifact handling
+* release handling
+* CodeQL
+* dependency review
+* secret handling
+* concurrency
+* caching correctness
+* Windows runner compatibility
+
+Do not disable security workflows to make CI pass.
+
+---
+
+# 25. CI MUST MATCH LOCAL BUILD
+
+Ensure CI uses the same actual build architecture as the project.
+
+The workflow must:
+
+1. checkout
+2. setup .NET 8
+3. restore
+4. build
+5. test
+6. publish
+7. security scan
+
+Do not have CI test a different project or different configuration from production.
+
+---
+
+# 26. RELEASE PIPELINE AUDIT
+
+Audit:
+
+```text
+.github/workflows/release.yml
+```
+
+and release/build scripts.
+
+Verify:
+
+* versioning
+* tag validation
+* clean checkout
+* deterministic build
+* self-contained win-x64 publish
+* correct executable
+* package contents
+* SHA-256 checksum
+* artifact naming
+* release notes
+* no source secrets
+* no development-only files
+* no debug artifacts
+
+Inspect the final ZIP contents.
+
+---
+
+# 27. PRODUCTION ARTIFACT INSPECTION
+
+After publish, inspect the actual output.
+
+Verify:
+
+```text
+CamfrogMultiID.exe
+```
+
+exists.
+
+Check:
+
+* DLLs
+* configuration
+* runtime files
+* resources
+* native dependencies
+* unexpected source files
+* test files
+* development files
+* secret files
+* `.pdb` policy
+* package size
+* executable metadata
+
+Nothing sensitive should ship.
+
+---
+
+# 28. SOURCE CODE LEAK AUDIT
+
+Perform a final repository-wide leak scan.
+
+Search for:
+
+```text
+password
+passwd
+secret
+token
+apikey
+api_key
+connectionstring
+private_key
+BEGIN PRIVATE KEY
+BEGIN RSA PRIVATE KEY
+Authorization:
+Bearer
+```
+
+Classify every result.
+
+Detect:
+
+* credentials
+* tokens
+* private keys
+* real API keys
+* connection strings
+* local machine paths containing sensitive data
+* personal information accidentally committed
+
+Remove actual secrets immediately.
+
+Never replace a secret with another fake secret that looks real.
+
+Use secure configuration.
+
+---
+
+# 29. GIT HYGIENE
+
+Audit:
+
+```text
+.gitignore
+.gitattributes
+```
+
+Ensure these are excluded where appropriate:
+
+```text
+bin/
+obj/
+.vs/
+TestResults/
+coverage/
+publish/
+artifacts/
+user secrets
+local configuration
+developer-specific files
+```
+
+Do not delete legitimate source files merely to make the repository smaller.
+
+---
+
+# 30. DOCUMENTATION SYNCHRONIZATION
+
+After implementation, update ALL relevant documentation.
+
+At minimum inspect:
+
+```text
+README.md
+ABOUT.md
+AGENTS.md
+CONTRIBUTING.md
+SECURITY.md
+CHANGELOG.md
+ROADMAP.md
+IMPLEMENTATION-CHECKLIST.md
+docs/
+.github/
+```
+
+Documentation must reflect the actual repository.
+
+Remove stale claims.
+
+Remove references to nonexistent infrastructure.
+
+Remove obsolete Docker instructions if Docker is not part of the product.
+
+Document:
+
+* architecture
+* prerequisites
+* build
+* test
+* publish
+* release
+* security model
+* credential protection
+* process safety
+* data locations
+* troubleshooting
+* known limitations
+* operational procedures
+
+Never document a feature that does not actually exist.
+
+---
+
+# 31. TEMPLATE / GENERIC CONTENT AUDIT
+
+Find generic template artifacts such as:
+
+```text
+Your Project
+Example Project
+Acme
+TODO
+Replace this
+Coming soon
+Lorem ipsum
+sample
+template
+starter
+```
+
+Remove or replace all inappropriate content.
+
+Documentation must describe **Camfrog Multi-ID Manager**, not a generic starter repository.
+
+---
+
+# 32. CODE QUALITY
+
+Apply:
+
+* SOLID
+* DRY where appropriate
+* KISS
+* separation of concerns
+* dependency inversion
+* immutable models where appropriate
+* explicit validation
+* deterministic behavior
+* resource ownership
+* proper disposal
+
+Do not over-engineer simple code.
+
+Do not create abstractions without a real reason.
+
+---
+
+# 33. MODERN .NET 8 REVIEW
+
+Use appropriate modern .NET 8 APIs.
+
+Prefer modern guard APIs such as:
+
+```csharp
+ArgumentNullException.ThrowIfNull(value);
+ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+```
+
+where applicable.
+
+Use:
+
+* file-scoped namespaces
+* nullable reference types
+* required members where appropriate
+* collection expressions where they improve clarity
+* primary constructors only when they improve maintainability
+* modern pattern matching
+* `IReadOnlyCollection`
+* cancellation tokens
+* async APIs
+
+Do not modernize code merely for syntax aesthetics if it reduces clarity.
+
+---
+
+# 34. RESOURCE MANAGEMENT
+
+Audit every:
+
+* Stream
+* FileStream
+* SQLite connection
+* SQLite command
+* Process
+* Timer
+* CancellationTokenSource
+* event subscription
+
+Verify deterministic disposal.
+
+Look for leaks.
+
+---
+
+# 35. CONFIGURATION AUDIT
+
+Verify configuration behavior across:
+
+* development
+* test
+* release
+* production
+
+No production behavior should depend accidentally on:
+
+```text
+Developer machine
+USERPROFILE
+current working directory
+Visual Studio
+IDE-only configuration
+uncommitted local files
+environment variables that CI does not provide
+```
+
+Use deterministic paths and configuration.
+
+---
+
+# 36. WINDOWS COMPATIBILITY
+
+Because this is a Windows WPF application, validate:
+
+* Windows x64
+* .NET 8
+* self-contained deployment
+* user profile paths
+* `%LOCALAPPDATA%`
+* permissions
+* process APIs
+* DPAPI
+* filesystem behavior
+* DPI
+* Unicode paths
+* spaces in paths
+
+Avoid requiring administrator privileges unless genuinely necessary.
+
+---
+
+# 37. NATIVE TOOLCHAIN BOUNDARY
+
+The repository may contain optional Ubuntu native tooling:
+
+* MinGW-w64
+* Wine
+* CMake
+* vcpkg
+
+Treat this as auxiliary tooling.
+
+Do NOT incorrectly make MinGW/Wine the production build path for the WPF .NET application.
+
+The authoritative production build must remain the supported .NET Windows build/publish process.
+
+---
+
+# 38. PERFORMANCE AUDIT
+
+Look for:
+
+* unnecessary process spawning
+* synchronous filesystem I/O
+* repeated database queries
+* unnecessary UI refreshes
+* excessive allocations
+* unbounded collections
+* timers running indefinitely
+* polling loops
+* runaway retries
+
+Do not optimize blindly.
+
+Measure or reason from concrete hot paths.
+
+---
+
+# 39. RELIABILITY / RECOVERY
+
+For every external boundary, ask:
+
+> What happens if this operation fails halfway through?
+
+Audit:
+
+* database writes
+* account creation
+* account deletion
+* process startup
+* process shutdown
+* credential save
+* configuration save
+* application startup
+* application shutdown
+
+Implement safe recovery.
+
+---
+
+# 40. STARTUP / SHUTDOWN
+
+Audit application startup.
+
+Verify:
+
+* corrupted configuration handling
+* database initialization
+* stale processes
+* stale state
+* crash recovery
+* single-instance behavior
+* graceful shutdown
+* background task cancellation
+* resource disposal
+
+Application shutdown must not hang indefinitely.
+
+---
+
+# 41. OBSERVABILITY
+
+Production failures should be diagnosable.
+
+Ensure useful logs/diagnostics exist for:
+
+* startup
+* initialization
+* account operations
+* process operations
+* persistence
+* shutdown
+* unexpected failures
+
+Avoid excessive noisy logging.
+
+Never expose secrets.
+
+---
+
+# 42. DO NOT HIDE FAILURES
+
+Never use:
+
+```text
+#pragma warning disable
+```
+
+as a shortcut.
+
+Never change:
+
+```text
+TreatWarningsAsErrors
+```
+
+to make CI green.
+
+Never remove tests because they fail.
+
+Never weaken CodeQL.
+
+Never disable dependency review.
+
+Never disable nullable analysis.
+
+Never weaken security validation.
+
+Fix the underlying problem.
+
+---
+
+# 43. IMPLEMENT MISSING FUNCTIONALITY
+
+For every feature that is clearly intended by the current architecture/documentation but incomplete:
+
+1. determine intended behavior,
+2. design the implementation,
+3. implement it,
+4. test it,
+5. document it,
+6. integrate it into CI where applicable.
+
+Do not invent unrelated features.
+
+Prioritize correctness and production reliability over feature quantity.
+
+---
+
+# 44. CHANGE MANAGEMENT
+
+Make small logical commits where practical.
+
+Use meaningful commit messages such as:
+
+```text
+fix: correct solution release configuration mapping
+fix: harden process identity validation
+fix: prevent plaintext credential persistence
+test: add SQLite concurrency regression coverage
+refactor: isolate process lifecycle service
+ci: align release build with production publish
+docs: synchronize production deployment documentation
+```
+
+Do not create meaningless commits.
+
+---
+
+# 45. VALIDATION LOOP
+
+After every meaningful change:
+
+```text
+FORMAT
+↓
+BUILD
+↓
+TEST
+↓
+STATIC ANALYSIS
+↓
+SECURITY CHECK
+↓
+REVIEW
+```
+
+If a test fails:
+
+```text
+READ FAILURE
+↓
+TRACE ROOT CAUSE
+↓
+FIX ROOT CAUSE
+↓
+ADD/UPDATE REGRESSION TEST
+↓
+RERUN
+```
+
+Do not repeatedly rerun unchanged failing tests.
+
+---
+
+# 46. FINAL FULL VALIDATION
+
+Before declaring completion, execute the equivalent of:
+
+```powershell
+dotnet restore
+dotnet build .\CamfrogMultiID.sln -c Debug --no-restore
+dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+dotnet test .\CamfrogMultiID.sln -c Release --no-build
+dotnet publish .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release -r win-x64 --self-contained true
+```
+
+Also execute all repository-provided validation scripts.
+
+Then inspect:
+
+* warnings
+* errors
+* test count
+* failed tests
+* skipped tests
+* generated artifacts
+* package contents
+* security scan
+* Git diff
+* Git status
+
+---
+
+# 47. FINAL ZERO-DEFECT GATE
+
+Do not report:
+
+> Production ready
+
+unless all applicable conditions are true.
+
+Required:
+
+* [ ] solution configuration valid
+* [ ] Debug build passes
+* [ ] Release build passes
+* [ ] zero unexpected warnings
+* [ ] tests pass
+* [ ] regression tests pass
+* [ ] publish succeeds
+* [ ] production executable exists
+* [ ] production artifact inspected
+* [ ] no leaked secrets
+* [ ] no unfinished production code
+* [ ] no placeholder implementation
+* [ ] no critical security issue
+* [ ] no known release-blocking bug
+* [ ] CI matches local production build
+* [ ] CodeQL passes
+* [ ] dependency review passes
+* [ ] documentation synchronized
+* [ ] release workflow validated
+* [ ] Git working tree reviewed
+* [ ] architecture boundaries verified
+
+If any item fails, continue working.
+
+---
+
+# 48. FINAL REPORT FORMAT
+
+When work is complete, provide a concise but complete engineering report.
+
+Use:
+
+## Executive Summary
+
+State what was actually changed.
+
+## Bugs Found
+
+For each:
+
+```text
+Severity:
+Location:
+Root Cause:
+Fix:
+Regression Test:
+```
+
+## Security Findings
+
+```text
+Finding:
+Risk:
+Fix:
+Verification:
+```
+
+## Build Validation
+
+```text
+Debug:
+Release:
+Tests:
+Publish:
+Static Analysis:
+CodeQL:
+Dependency Review:
+```
+
+## Production Artifact
+
+Report:
+
+```text
+RID:
+Framework:
+Self-contained:
+Executable:
+Artifact:
+Checksum:
+```
+
+## Documentation Updated
+
+List every updated file.
+
+## CI/CD Updated
+
+List every updated workflow.
+
+## Remaining Issues
+
+Only list genuine remaining issues.
+
+Do not invent issues.
+
+If none remain:
+
+```text
+No known production-blocking issues remain.
+```
+
+## Production Gate
+
+Provide the checklist with actual PASS/FAIL status.
+
+---
+
+# 49. IMPORTANT EXECUTION BEHAVIOR
+
+You are an implementation agent, not a consultant.
+
+Do not merely tell me what should be changed.
+
+Actually:
+
+* inspect
+* modify
+* create
+* delete obsolete artifacts
+* test
+* validate
+* fix
+* retest
+* synchronize
+* review
+
+If you discover a related defect while fixing another defect, investigate it immediately.
+
+Follow dependency chains.
+
+Example:
+
+```text
+build failure
+→ solution configuration
+→ project configuration
+→ project references
+→ target framework
+→ CI build
+→ release build
+```
+
+Do not patch only the visible error if the underlying configuration is broken.
+
+---
+
+# 50. ABSOLUTE STOP CONDITION
+
+You may stop only when:
+
+1. all discovered actionable defects are fixed,
+2. all required functionality is implemented,
+3. tests pass,
+4. release build passes,
+5. production publish passes,
+6. security validation passes,
+7. CI configuration is valid,
+8. documentation matches reality,
+9. no known production-blocking issue remains.
+
+If the environment prevents a validation step, explicitly identify:
+
+```text
+BLOCKED VALIDATION
+Reason:
+What was attempted:
+What could not be verified:
+What remains to be verified:
+```
+
+Never claim a test passed when it was not actually executed.
+
+Never claim production-ready based only on static inspection.
+
+---
+
+# START NOW
+
+Begin with:
+
+```text
+PHASE 1 — FULL REPOSITORY INVENTORY
+PHASE 2 — BUG / TODO / SECURITY SCAN
+PHASE 3 — ARCHITECTURE + BUILD GRAPH AUDIT
+PHASE 4 — IMPLEMENTATION
+PHASE 5 — TEST + STATIC ANALYSIS
+PHASE 6 — SECURITY HARDENING
+PHASE 7 — CI/CD + RELEASE VALIDATION
+PHASE 8 — DOCUMENTATION SYNCHRONIZATION
+PHASE 9 — FINAL PRODUCTION GATE
+```
+
+Do not ask for confirmation for routine engineering fixes.
+
+Make safe, reversible, evidence-based changes autonomously.
+
+Start inspecting the repository now.
