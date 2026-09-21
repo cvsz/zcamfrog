@@ -102,9 +102,14 @@ public partial class SettingsWindow : Window
     {
         var configured = SandboxExe.Text.Trim();
         var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
-        SandboxStatus.Text = string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved)
-            ? Strings.SandboxStatusNone
-            : L10n.Fmt(Strings.SandboxStatusOk, resolved, ProcessSessionService.GetBoxesRoot());
+        if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
+        {
+            SandboxStatus.Text = Strings.SandboxStatusNone;
+            return;
+        }
+        var version = ProcessSessionService.GetSandboxieVersion(resolved);
+        SandboxStatus.Text = L10n.Fmt(Strings.SandboxStatusOk, resolved, ProcessSessionService.GetBoxesRoot())
+            + (string.IsNullOrWhiteSpace(version) ? string.Empty : $" v{version}");
     }
 
     private void DownloadSandboxie_Click(object sender, RoutedEventArgs e)

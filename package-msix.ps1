@@ -1,6 +1,3 @@
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
-
 # MSIX packaging for Camfrog Multi-ID Manager (path-ready, not yet verified).
 # Requires: Windows SDK (makeappx.exe, signtool.exe) and a code-signing
 # certificate (self-signed is fine for local install; Store/EV for distribution).
@@ -19,6 +16,9 @@ param(
     [string]$Version = '1.0.0',
     [string]$CertificateThumbprint = ''
 )
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 
 if ($env:OS -ne 'Windows_NT') { throw 'Run MSIX packaging on Windows.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must be MAJOR.MINOR.PATCH, got: $Version" }

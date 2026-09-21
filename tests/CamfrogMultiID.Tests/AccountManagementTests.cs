@@ -198,6 +198,16 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void GetSandboxieVersion_ReadsRealFile()
+    {
+        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        Assert.NotNull(ProcessSessionService.GetSandboxieVersion(cmd));
+        Assert.Null(ProcessSessionService.GetSandboxieVersion(Path.Combine(_tempRoot, "missing.exe")));
+        Assert.Null(ProcessSessionService.GetSandboxieVersion(""));
+        Assert.Null(ProcessSessionService.GetSandboxieVersion(null));
+    }
+
+    [Fact]
     public void BuildCreateBoxArguments_QuotesBox()
     {
         var args = ProcessSessionService.BuildCreateBoxArguments("My Box");

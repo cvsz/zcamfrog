@@ -849,6 +849,23 @@ public sealed class ProcessSessionService
     }
 
     public const string SandboxieReleasesUrl = "https://github.com/sandboxie-plus/Sandboxie/releases";
+    public const string SandboxieRepository = "https://github.com/sandboxie-plus/Sandboxie";
+
+    public static string? GetSandboxieVersion(string? startExePath)
+    {
+        if (string.IsNullOrWhiteSpace(startExePath))
+            return null;
+        try
+        {
+            if (!File.Exists(startExePath))
+                return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(startExePath);
+            var version = info.ProductVersion ?? info.FileVersion;
+            return string.IsNullOrWhiteSpace(version) ? null : version.Trim();
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
 
     public static string GetBoxesRoot()
     {

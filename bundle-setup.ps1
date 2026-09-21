@@ -1,18 +1,26 @@
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
-
 # Camfrog Multi-ID portable bundle setup.
 # Downloads Sandboxie-Plus (latest GitHub release) and the latest
 # CamfrogMultiID release asset, verifies checksums where available,
 # and prints the manual Camfrog client step (third-party installer).
-# Usage: .\bundle-setup.ps1 [-OutDir .\bundle] [-ManagerVersion v1.0.0]
+# Usage: .\bundle-setup.ps1 [-OutDir .\bundle] [-ManagerVersion v1.0.0] [-InstallSandboxie]
 
 param(
-    [string]$OutDir = (Join-Path $PSScriptRoot 'bundle'),
-    [string]$ManagerVersion = 'latest'
+    [string]$OutDir = '',
+    [string]$ManagerVersion = 'latest',
+    [switch]$InstallSandboxie
 )
 
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
 if ($env:OS -ne 'Windows_NT') { throw 'Run this bundle script on Windows.' }
+if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path $PSScriptRoot 'bundle' }
+
+function Test-Elevated {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
 
 $bundleTools = Join-Path $OutDir 'tools'
 New-Item -ItemType Directory -Path $bundleTools -Force | Out-Null
@@ -47,9 +55,18 @@ Write-Host '== Camfrog Multi-ID bundle setup ==' -ForegroundColor Cyan
 
 $sb = Get-LatestSandboxieAsset
 Write-Host "Sandboxie-Plus $($sb.Version)" -ForegroundColor Green
-Save-Verified $sb.Url (Join-Path $bundleTools $sb.Name)
+$installerPath = Join-Path $bundleTools $sb.Name
+Save-Verified $sb.Url $installerPath
 Write-Host "Saved: $($sb.Name)"
-Write-Host 'Install it with default options, then point Settings at Start.exe (auto-detected).'
+if ($InstallSandboxie) {
+    if (-not (Test-Elevated)) { throw 'Re-run with -InstallSandboxie from an elevated prompt (driver install requires admin).' }
+    Write-Host 'Installing Sandboxie-Plus silently...' -ForegroundColor Yellow
+    Start-Process -LiteralPath $installerPath -ArgumentList '/S' -Wait
+    Write-Host 'Sandboxie-Plus installed. Settings auto-detects Start.exe.' -ForegroundColor Green
+}
+else {
+    Write-Host 'Install it with default options, then point Settings at Start.exe (auto-detected).'
+}
 
 $mgr = Get-ManagerAsset $ManagerVersion
 Write-Host "Manager $($mgr.ZipName)" -ForegroundColor Green
