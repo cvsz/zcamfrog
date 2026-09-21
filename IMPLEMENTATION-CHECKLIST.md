@@ -1,70 +1,42 @@
-# Implementation Checklist
+# Implementation Checklist — Camfrog Multi-ID Manager
 
-Use this checklist after creating a repository from `ztemplate`.
+Use this checklist when changing the manager. All items are currently
+satisfied on `main`; re-verify the touched areas per change.
 
-## Repository identity
+## Build and test
 
-- [ ] Replace `ztemplate` references with the real project name.
-- [ ] Replace template descriptions and badges.
-- [ ] Confirm license ownership and year.
-- [ ] Configure repository topics, description, homepage, and template status.
-
-## Ownership and governance
-
-- [ ] Update `.github/CODEOWNERS`.
-- [ ] Review `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
-- [ ] Configure branch protection or repository rulesets.
-- [ ] Require pull request review where appropriate.
-- [ ] Require passing status checks before merge.
+- [x] `dotnet restore CamfrogMultiID.sln` + win-x64 graph restore succeed.
+- [x] Debug and Release build with 0 warnings / 0 errors.
+- [x] `dotnet test` green (79 tests, 0 skipped unresolved).
+- [x] `build-release.ps1` publishes `CamfrogMultiID.exe` (checksum recorded).
+- [x] Solution GUIDs complete (`BuildProjectInSolution=True` for all).
 
 ## Security
 
-- [ ] Review `SECURITY.md` and configure private vulnerability reporting.
-- [ ] Enable Dependabot alerts and security updates.
-- [ ] Review CodeQL language detection/support for the actual stack.
-- [ ] Keep dependency review enabled for pull requests where supported.
-- [ ] Configure secret scanning and push protection where available.
-- [ ] Add stack-specific SAST, container, IaC, and SBOM checks as needed.
-- [ ] Confirm Actions permissions follow least privilege.
-
-## Development
-
-- [ ] Select the language/runtime and package manager.
-- [ ] Add formatter and linter configuration.
-- [ ] Add unit, integration, and end-to-end tests as appropriate.
-- [ ] Replace placeholder Makefile targets with real commands.
-- [ ] Replace or remove the placeholder Dockerfile.
-- [ ] Populate `.env.example` with safe non-secret keys only.
+- [x] DPAPI `CurrentUser` only; no plaintext passwords in logs, CLI, DB.
+- [x] Process stop refuses foreign PIDs (start-time + exe identity).
+- [x] Room URLs restricted to the `camfrog:` scheme.
+- [x] Backup/restore zips validated against path traversal.
+- [x] Secrets directory ACL restricted to the current user.
+- [x] CodeQL (`csharp`) and dependency review enabled; least privilege.
+- [x] No secrets committed (see `docs/troubleshooting.md` entry 5).
 
 ## CI/CD
 
-- [ ] Customize CI for the selected stack.
-- [ ] Pin runtime versions and define supported-version matrices.
-- [ ] Add build and package validation.
-- [ ] Add artifact retention settings where needed.
-- [ ] Configure environments, approvals, and deployment protections.
-- [ ] Verify workflows from forks do not receive unsafe credentials.
-
-## Release
-
-- [ ] Decide on Semantic Versioning or another explicit versioning policy.
-- [ ] Configure changelog and release-note generation.
-- [ ] Configure package/container publishing only when needed.
-- [ ] Add provenance, signing, and attestations for production artifacts where appropriate.
-- [ ] Document rollback procedures.
+- [x] `ci.yml` builds/tests/publishes the actual WPF app on Windows.
+- [x] `release.yml` tags (`v*.*.*`) produce zip + `.sha256` + provenance.
+- [x] Dependabot covers `github-actions` and `nuget`.
+- [x] Proven release: `v1.0.0` workflow run green with artifacts.
 
 ## Documentation
 
-- [ ] Complete `docs/architecture.md`.
-- [ ] Complete `docs/development.md`.
-- [ ] Complete `docs/release.md`.
-- [ ] Add ADRs for material architectural decisions.
-- [ ] Document operational ownership and support expectations.
+- [x] `docs/architecture.md`, `development.md`, `release.md`,
+  `troubleshooting.md`, `sandboxie.md` match behavior.
+- [x] README build/run/publish sections current.
+- [x] CHANGELOG updated per change; AGENTS.md project-specific.
 
-## Final verification
+## Release readiness
 
-- [ ] Fresh clone works with documented bootstrap steps.
-- [ ] CI passes on `main` and pull requests.
-- [ ] No secrets or private information are committed.
-- [ ] Security checks are enabled and passing.
-- [ ] A release can be created and rolled back according to documentation.
+- [x] Fresh clone builds per `docs/development.md`.
+- [x] Thai + English UI verified (build + clean launch + key coverage test).
+- [x] Rollback = re-tag previous `vX.Y.Z` (see `docs/release.md`).

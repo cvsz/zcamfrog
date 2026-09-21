@@ -2,6 +2,12 @@
 
 All notable changes to Camfrog Multi-ID Manager are documented here. Based on Keep a Changelog and Semantic Versioning.
 
+## [Unreleased]
+### Fixed
+- Issue template security URL pointed at the `ztemplate` template repo; now `zcamfrog`
+- `IMPLEMENTATION-CHECKLIST.md` rewritten from generic template to project-specific gates
+- README test count synchronized (79)
+
 ## [1.0.0] - 2026-09-20
 First tagged release. Published via the release workflow with `CamfrogMultiID-v1.0.0-win-x64.zip` + `.sha256` and build provenance attestation.
 
