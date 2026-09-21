@@ -28,4 +28,5 @@ public sealed class AppSettings
     public int AutoBackupDays { get; set; }
     public int AutoBackupKeepCount { get; set; } = 4;
     public DateTime? LastAutoBackupUtc { get; set; }
+    public string Language { get; set; } = "en";
 }

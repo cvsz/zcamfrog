@@ -304,7 +304,11 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-74 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
+78 tests pass. Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
+
+## V20 Thai localization
+
+Settings → Language → English/ไทย (full restart to apply). All 4 windows, grid headers, context menu, and every dialog/message are resourced (`Strings.resx` + `Strings.th.resx`, 152 keys); a reflection test asserts every key resolves non-empty in both cultures. Thai launch verified end-to-end (clean start, no startup errors).
 
 ## V17 reliability + backup
 

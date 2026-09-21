@@ -97,6 +97,38 @@ public sealed class ProcessSessionServiceTests : IDisposable
     }
 
     [Fact]
+    public void StartStop_WithRealProcess_Roundtrips()
+    {
+        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        var acc = new CamfrogAccount
+        {
+            DisplayName = "live",
+            Username = "live_" + Guid.NewGuid().ToString("N"),
+            PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+            ProfileDirectory = Path.Combine(_tempRoot, "p_live"),
+            Enabled = true
+        };
+        acc.Id = _db.Add(acc);
+        var settings = new AppSettings
+        {
+            ClientExecutable = cmd,
+            ClientArgumentsTemplate = "/c ping -n 30 127.0.0.1 >nul"
+        };
+
+        using var process = _svc.Start(acc, settings);
+        try
+        {
+            Assert.Equal("Running", _db.GetById(acc.Id)!.Status);
+            Assert.True(ProcessSessionService.IsTrackedProcessAlive(_db.GetById(acc.Id)!, out _));
+        }
+        finally
+        {
+            _svc.Stop(_db.GetById(acc.Id)!);
+        }
+        Assert.Equal("Stopped", _db.GetById(acc.Id)!.Status);
+    }
+
+    [Fact]
     public void Start_MissingExecutable_Throws()
     {
         var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_tempRoot, "p1") };

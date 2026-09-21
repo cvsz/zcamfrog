@@ -8,6 +8,7 @@
 # .NET build artifacts
 bin/
 obj/
+*_wpftmp.csproj
 out/
 publish/
 artifacts/

@@ -1,0 +1,482 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <!-- Main window -->
+  <data name="MainTitle" xml:space="preserve">
+    <value>Camfrog Multi-ID Manager</value>
+  </data>
+  <data name="AddAccount" xml:space="preserve">
+    <value>+ Add Account</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit...</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="EnableDisable" xml:space="preserve">
+    <value>Enable/Disable</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="StartSelected" xml:space="preserve">
+    <value>Start Selected</value>
+  </data>
+  <data name="StopSelected" xml:space="preserve">
+    <value>Stop Selected</value>
+  </data>
+  <data name="StartAll" xml:space="preserve">
+    <value>Start All</value>
+  </data>
+  <data name="StopAll" xml:space="preserve">
+    <value>Stop All</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Search:</value>
+  </data>
+  <data name="ColId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="ColAccount" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="ColUsername" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="ColEnabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="ColStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="ColPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColStarted" xml:space="preserve">
+    <value>Started (UTC)</value>
+  </data>
+  <data name="ColError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="SelectedAccount" xml:space="preserve">
+    <value>Selected Account</value>
+  </data>
+  <data name="ApplicationLog" xml:space="preserve">
+    <value>Application Log</value>
+  </data>
+  <data name="Level" xml:space="preserve">
+    <value>Level:</value>
+  </data>
+  <data name="AutoScroll" xml:space="preserve">
+    <value>Auto-scroll</value>
+  </data>
+  <data name="ClearLogView" xml:space="preserve">
+    <value>Clear Log View</value>
+  </data>
+  <data name="ExportLog" xml:space="preserve">
+    <value>Export Log...</value>
+  </data>
+  <data name="Diagnostics" xml:space="preserve">
+    <value>Diagnostics...</value>
+  </data>
+  <data name="OpenLogFolder" xml:space="preserve">
+    <value>Open Log Folder</value>
+  </data>
+  <data name="CtxStart" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="CtxStop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="CtxChangePassword" xml:space="preserve">
+    <value>Change Password...</value>
+  </data>
+  <data name="CtxClearError" xml:space="preserve">
+    <value>Clear Error</value>
+  </data>
+  <!-- Account window -->
+  <data name="AddAccountTitle" xml:space="preserve">
+    <value>Add Camfrog Account</value>
+  </data>
+  <data name="DisplayName" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Username" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="NewPasswordTitle" xml:space="preserve">
+    <value>New password (leave blank to keep current)</value>
+  </data>
+  <data name="PasswordHintAdd" xml:space="preserve">
+    <value>Stored with Windows DPAPI (CurrentUser). Never logged or passed on the command line.</value>
+  </data>
+  <data name="PasswordHintEdit" xml:space="preserve">
+    <value>Leave blank to keep the stored DPAPI password. Enter a value to replace it.</value>
+  </data>
+  <data name="RoomUrlLabel" xml:space="preserve">
+    <value>Room URL (optional, camfrog: link to auto-join)</value>
+  </data>
+  <data name="RoomUrlHint" xml:space="preserve">
+    <value>From camfrog.com room join links, e.g. camfrog://join_room/?name=RoomName. Only the camfrog: scheme is accepted.</value>
+  </data>
+  <data name="Enabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="AutoRestartLabel" xml:space="preserve">
+    <value>Auto-restart if the client exits unexpectedly</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <!-- Settings window -->
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="ClientExecutable" xml:space="preserve">
+    <value>Camfrog client executable</value>
+  </data>
+  <data name="Browse" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="ArgsTemplate" xml:space="preserve">
+    <value>Client arguments template (optional)</value>
+  </data>
+  <data name="ArgsHint" xml:space="preserve">
+    <value>Supported placeholders: {username}, {profile}. Leave blank unless your installed client documents these options. Password is never injected.</value>
+  </data>
+  <data name="SandboxLabel" xml:space="preserve">
+    <value>Run each account in its own Sandboxie box (allows simultaneous instances)</value>
+  </data>
+  <data name="SandboxExeLabel" xml:space="preserve">
+    <value>Sandboxie Start.exe (blank = auto-detect)</value>
+  </data>
+  <data name="DownloadSandboxie" xml:space="preserve">
+    <value>Download Sandboxie-Plus</value>
+  </data>
+  <data name="CreateBoxes" xml:space="preserve">
+    <value>Create Boxes For All Accounts</value>
+  </data>
+  <data name="AutoBackupEvery" xml:space="preserve">
+    <value>Auto-backup every</value>
+  </data>
+  <data name="DaysOffHint" xml:space="preserve">
+    <value>days (0 = off), keep</value>
+  </data>
+  <data name="Files" xml:space="preserve">
+    <value>files</value>
+  </data>
+  <data name="OpenDataFolder" xml:space="preserve">
+    <value>Open Data Folder</value>
+  </data>
+  <data name="BackupData" xml:space="preserve">
+    <value>Backup Data...</value>
+  </data>
+  <data name="RestoreData" xml:space="preserve">
+    <value>Restore Data...</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language (restarts to apply fully)</value>
+  </data>
+  <!-- Change password window -->
+  <data name="ChangePasswordTitle" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="ChangePasswordHint" xml:space="preserve">
+    <value>Replaces the DPAPI-protected secret. The old password cannot be recovered.</value>
+  </data>
+  <!-- Messages ({0} placeholders) -->
+  <data name="MsgSelectAccount" xml:space="preserve">
+    <value>Please select an account first.</value>
+  </data>
+  <data name="TitleEditAccount" xml:space="preserve">
+    <value>Edit Account</value>
+  </data>
+  <data name="TitleDeleteAccount" xml:space="preserve">
+    <value>Delete Account</value>
+  </data>
+  <data name="TitleEnableDisable" xml:space="preserve">
+    <value>Enable/Disable</value>
+  </data>
+  <data name="TitleStartAccount" xml:space="preserve">
+    <value>Start Account</value>
+  </data>
+  <data name="TitleStopAccount" xml:space="preserve">
+    <value>Stop Account</value>
+  </data>
+  <data name="TitleStartAll" xml:space="preserve">
+    <value>Start All</value>
+  </data>
+  <data name="TitleStopAll" xml:space="preserve">
+    <value>Stop All</value>
+  </data>
+  <data name="TitleClearError" xml:space="preserve">
+    <value>Clear Error</value>
+  </data>
+  <data name="TitleChangePassword" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="TitleValidation" xml:space="preserve">
+    <value>Validation</value>
+  </data>
+  <data name="TitleSaveError" xml:space="preserve">
+    <value>Save Error</value>
+  </data>
+  <data name="TitleStartError" xml:space="preserve">
+    <value>Start Error</value>
+  </data>
+  <data name="TitleStopError" xml:space="preserve">
+    <value>Stop Error</value>
+  </data>
+  <data name="TitleUpdateError" xml:space="preserve">
+    <value>Update Error</value>
+  </data>
+  <data name="TitleDeleteError" xml:space="preserve">
+    <value>Delete Error</value>
+  </data>
+  <data name="MsgEnterDisplayName" xml:space="preserve">
+    <value>Please enter a display name.</value>
+  </data>
+  <data name="MsgDisplayNameTooLong" xml:space="preserve">
+    <value>Display name is too long (max 80 characters).</value>
+  </data>
+  <data name="MsgEnterUsername" xml:space="preserve">
+    <value>Please enter a username.</value>
+  </data>
+  <data name="MsgUsernameTooLong" xml:space="preserve">
+    <value>Username is too long (max 80 characters).</value>
+  </data>
+  <data name="MsgEnterPassword" xml:space="preserve">
+    <value>Please enter a password.</value>
+  </data>
+  <data name="MsgDuplicateAccount" xml:space="preserve">
+    <value>An account with this username already exists.</value>
+  </data>
+  <data name="TitleDuplicateAccount" xml:space="preserve">
+    <value>Duplicate Account</value>
+  </data>
+  <data name="MsgSaveAccountFailed" xml:space="preserve">
+    <value>Unable to save the account.{0}{0}{1}</value>
+  </data>
+  <data name="MsgAccountGone" xml:space="preserve">
+    <value>The selected account no longer exists.</value>
+  </data>
+  <data name="MsgConfirmDelete" xml:space="preserve">
+    <value>Delete account '{1}' ({2})?{0}{0}This removes the database row, DPAPI secret, and profile directory. This cannot be undone.</value>
+  </data>
+  <data name="TitleConfirmDelete" xml:space="preserve">
+    <value>Confirm Delete</value>
+  </data>
+  <data name="MsgDeleteFailed" xml:space="preserve">
+    <value>Unable to delete '{0}'.{1}{1}{2}</value>
+  </data>
+  <data name="MsgNoEnabledAccounts" xml:space="preserve">
+    <value>No enabled accounts to start.</value>
+  </data>
+  <data name="MsgConfirmStartAll" xml:space="preserve">
+    <value>Start {0} enabled account(s)?{1}{1}Verify individual launch first; the client may ignore {{profile}} isolation.</value>
+  </data>
+  <data name="MsgConfirmStopAll" xml:space="preserve">
+    <value>Stop all {0} account(s)?</value>
+  </data>
+  <data name="MsgStartFailed" xml:space="preserve">
+    <value>Unable to start '{0}'.{1}{1}{2}</value>
+  </data>
+  <data name="MsgStopFailed" xml:space="preserve">
+    <value>Unable to stop '{0}'.{1}{1}{2}</value>
+  </data>
+  <data name="MsgUpdateFailed" xml:space="preserve">
+    <value>Unable to update '{0}'.{1}{1}{2}</value>
+  </data>
+  <data name="MsgPasswordUpdated" xml:space="preserve">
+    <value>Password updated (DPAPI protected).</value>
+  </data>
+  <data name="MsgEnterNewPassword" xml:space="preserve">
+    <value>Please enter a new password.</value>
+  </data>
+  <data name="MsgPasswordUpdateFailed" xml:space="preserve">
+    <value>Unable to update password.{0}{0}{1}</value>
+  </data>
+  <data name="MsgExeNotFound" xml:space="preserve">
+    <value>The selected executable does not exist.</value>
+  </data>
+  <data name="MsgSettingsSaved" xml:space="preserve">
+    <value>Settings saved.</value>
+  </data>
+  <data name="MsgInvalidRoomUrl" xml:space="preserve">
+    <value>Invalid room URL.{0}{0}{1}</value>
+  </data>
+  <data name="MsgTemplateWarning" xml:space="preserve">
+    <value>Arguments template has warnings:{0}{0}{1}{0}{0}Save anyway?</value>
+  </data>
+  <data name="TitleTemplateWarning" xml:space="preserve">
+    <value>Template Warning</value>
+  </data>
+  <data name="MsgSandboxieMissing" xml:space="preserve">
+    <value>Sandboxie is enabled but Start.exe was not found. Install Sandboxie-Plus or set its path.</value>
+  </data>
+  <data name="MsgOpenFolderFailed" xml:space="preserve">
+    <value>Unable to open data folder.{0}{0}{1}</value>
+  </data>
+  <data name="TitleOpenFolder" xml:space="preserve">
+    <value>Open Folder</value>
+  </data>
+  <data name="MsgBackupFailed" xml:space="preserve">
+    <value>Unable to create backup.{0}{0}{1}</value>
+  </data>
+  <data name="TitleBackup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="TitleBackupError" xml:space="preserve">
+    <value>Backup Error</value>
+  </data>
+  <data name="MsgRestoreFailed" xml:space="preserve">
+    <value>Unable to restore backup.{0}{0}{1}</value>
+  </data>
+  <data name="TitleRestore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="TitleRestoreError" xml:space="preserve">
+    <value>Restore Error</value>
+  </data>
+  <data name="MsgConfirmRestore" xml:space="preserve">
+    <value>Restore replaces the current database, secrets, and settings. Stop all running clients first.{0}{0}Continue?</value>
+  </data>
+  <data name="TitleConfirmRestore" xml:space="preserve">
+    <value>Confirm Restore</value>
+  </data>
+  <data name="MsgNoLogFile" xml:space="preserve">
+    <value>No log file exists yet.</value>
+  </data>
+  <data name="TitleLogs" xml:space="preserve">
+    <value>Logs</value>
+  </data>
+  <data name="MsgExportLogFailed" xml:space="preserve">
+    <value>Unable to export log.{0}{0}{1}</value>
+  </data>
+  <data name="MsgRestartRequired" xml:space="preserve">
+    <value>Language will apply fully after restarting the application.</value>
+  </data>
+  <data name="TitleLanguage" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="MsgBackupDaysInvalid" xml:space="preserve">
+    <value>Auto-backup interval must be a number from 0 to 365 (0 = off).</value>
+  </data>
+  <data name="MsgBackupKeepInvalid" xml:space="preserve">
+    <value>Backups to keep must be a number from 1 to 100.</value>
+  </data>
+  <data name="ExeStatusNone" xml:space="preserve">
+    <value>No client executable configured. Start operations will be disabled until configured.</value>
+  </data>
+  <data name="ExeStatusMissing" xml:space="preserve">
+    <value>Warning: the selected executable does not exist.</value>
+  </data>
+  <data name="ExeStatusOk" xml:space="preserve">
+    <value>Executable found. Arguments preview uses {username} and {profile} only.</value>
+  </data>
+  <data name="ExeStatusWarn" xml:space="preserve">
+    <value>Executable found. Template warning: {0}</value>
+  </data>
+  <data name="SandboxStatusNone" xml:space="preserve">
+    <value>Sandboxie: not found. Use the download button below, then Browse to Start.exe.</value>
+  </data>
+  <data name="SandboxStatusOk" xml:space="preserve">
+    <value>Sandboxie: found at {0}. Boxes live under {1}.</value>
+  </data>
+  <data name="SandboxieAutodetectFail" xml:space="preserve">
+    <value>Sandboxie Start.exe was not auto-detected. Install Sandboxie-Plus or set its path below.</value>
+  </data>
+  <data name="BoxesDone" xml:space="preserve">
+    <value>Created {0} Sandboxie box(es). Accounts can now run simultaneously.</value>
+  </data>
+  <data name="BoxesDoneFailures" xml:space="preserve">
+    <value>Created {0} box(es). Failures:{1}{1}{2}</value>
+  </data>
+  <data name="TitleCreateBoxes" xml:space="preserve">
+    <value>Create Boxes</value>
+  </data>
+  <data name="BackupSavedBody" xml:space="preserve">
+    <value>Backup saved.{0}{0}{1}{0}{0}Includes database, secrets, and settings. Profile directories are excluded.</value>
+  </data>
+  <data name="RestoreDoneBody" xml:space="preserve">
+    <value>Restore complete. The account list will refresh.</value>
+  </data>
+  <data name="DownloadTitle" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="MsgDownloadFailed" xml:space="preserve">
+    <value>Unable to open the download page.{0}{0}{1}</value>
+  </data>
+  <data name="MsgCreateBoxesNoExe" xml:space="preserve">
+    <value>Sandboxie Start.exe was not found. Install Sandboxie-Plus first.</value>
+  </data>
+  <data name="MsgDiagnosticsDone" xml:space="preserve">
+    <value>Diagnostics bundle saved.{0}{0}{1}{0}{0}Contains versions, account counts (no usernames), log, and settings. No passwords or secrets are included.</value>
+  </data>
+  <data name="TitleDiagnosticsError" xml:space="preserve">
+    <value>Diagnostics Error</value>
+  </data>
+  <data name="DetailsSelectPrompt" xml:space="preserve">
+    <value>Select an account to see isolation details and launch preview.</value>
+  </data>
+  <data name="StatusRefreshFailed" xml:space="preserve">
+    <value>Refresh failed: {0}</value>
+  </data>
+  <data name="AccountPrefix" xml:space="preserve">
+    <value>Account: {0}</value>
+  </data>
+  <data name="DataPrefix" xml:space="preserve">
+    <value>Data: {0}</value>
+  </data>
+  <data name="MsgSaveSettingsFailed" xml:space="preserve">
+    <value>Unable to save settings.{0}{0}{1}</value>
+  </data>
+  <data name="MsgDiagnosticsFailed" xml:space="preserve">
+    <value>Unable to export diagnostics.{0}{0}{1}</value>
+  </data>
+  <data name="MsgOpenLogFolderFailed" xml:space="preserve">
+    <value>Unable to open log folder.{0}{0}{1}</value>
+  </data>
+  <data name="StatusCounts" xml:space="preserve">
+    <value>Accounts: {0}  Running: {1}  Error: {2}  Disabled: {3}</value>
+  </data>
+  <data name="ClientNone" xml:space="preserve">
+    <value>Client: not configured (open Settings)</value>
+  </data>
+  <data name="ClientOk" xml:space="preserve">
+    <value>Client: {0}</value>
+  </data>
+  <data name="ClientMissing" xml:space="preserve">
+    <value>Client: missing — {0}</value>
+  </data>
+  <data name="TitleConfirmStartAll" xml:space="preserve">
+    <value>Confirm Start All</value>
+  </data>
+  <data name="TitleConfirmStopAll" xml:space="preserve">
+    <value>Confirm Stop All</value>
+  </data>
+</root>

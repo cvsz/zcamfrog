@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CamfrogMultiID.Core\CamfrogMultiID.Core.csproj" />
     <ProjectReference Include="..\..\src\CamfrogMultiID.Infrastructure\CamfrogMultiID.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj" />
   </ItemGroup>
 
 </Project>

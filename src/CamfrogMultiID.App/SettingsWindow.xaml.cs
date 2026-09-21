@@ -1,6 +1,8 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using CamfrogMultiID.Core;
 using CamfrogMultiID.Infrastructure;
@@ -9,6 +11,9 @@ namespace CamfrogMultiID.App;
 
 public partial class SettingsWindow : Window
 {
+    private bool _initialized;
+    private string _initialLanguage = "en";
+
     public SettingsWindow()
     {
         InitializeComponent();
@@ -17,16 +22,41 @@ public partial class SettingsWindow : Window
         Args.Text = settings.ClientArgumentsTemplate;
         SandboxBox.IsChecked = settings.UseSandboxie;
         SandboxExe.Text = settings.SandboxieStartExe;
-        BackupDays.Text = settings.AutoBackupDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        BackupKeep.Text = settings.AutoBackupKeepCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        BackupDays.Text = settings.AutoBackupDays.ToString(CultureInfo.InvariantCulture);
+        BackupKeep.Text = settings.AutoBackupKeepCount.ToString(CultureInfo.InvariantCulture);
+        SelectLanguage(settings.Language);
+        _initialLanguage = NormalizeLanguage(settings.Language);
         UpdateSandboxStatus();
         SandboxExe.TextChanged += (_, _) => UpdateSandboxStatus();
         if (settings.UseSandboxie && string.IsNullOrWhiteSpace(settings.SandboxieStartExe) && ProcessSessionService.FindSandboxieStart() is null)
-            ExeStatus.Text = "Sandboxie Start.exe was not auto-detected. Install Sandboxie-Plus or set its path below.";
-        DataDirText.Text = $"Data: {App.Paths.Root}";
+            ExeStatus.Text = Strings.SandboxieAutodetectFail;
+        DataDirText.Text = L10n.Fmt(Strings.DataPrefix, App.Paths.Root);
         UpdateExeStatus();
         Exe.TextChanged += (_, _) => UpdateExeStatus();
         Args.TextChanged += (_, _) => UpdateExeStatus();
+        _initialized = true;
+    }
+
+    private void SelectLanguage(string language)
+    {
+        var tag = NormalizeLanguage(language);
+        foreach (var item in LanguageBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag as string, tag, StringComparison.OrdinalIgnoreCase))
+            {
+                LanguageBox.SelectedItem = item;
+                return;
+            }
+        }
+        LanguageBox.SelectedIndex = 0;
+    }
+
+    private static string NormalizeLanguage(string? language) =>
+        string.Equals(language, "th", StringComparison.OrdinalIgnoreCase) ? "th" : "en";
+
+    private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized) return;
     }
 
     private void UpdateExeStatus()
@@ -34,18 +64,18 @@ public partial class SettingsWindow : Window
         var exe = Exe.Text.Trim();
         if (string.IsNullOrWhiteSpace(exe))
         {
-            ExeStatus.Text = "No client executable configured. Start operations will be disabled until configured.";
+            ExeStatus.Text = Strings.ExeStatusNone;
             return;
         }
         if (!File.Exists(exe))
         {
-            ExeStatus.Text = "Warning: the selected executable does not exist.";
+            ExeStatus.Text = Strings.ExeStatusMissing;
             return;
         }
         var warnings = ProcessSessionService.ValidateArgumentsTemplate(Args.Text.Trim());
         ExeStatus.Text = warnings.Count == 0
-            ? $"Executable found. Arguments preview uses {{username}} and {{profile}} only."
-            : $"Executable found. Template warning: {string.Join(" ", warnings)}";
+            ? Strings.ExeStatusOk
+            : L10n.Fmt(Strings.ExeStatusWarn, string.Join(" ", warnings));
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
@@ -73,8 +103,8 @@ public partial class SettingsWindow : Window
         var configured = SandboxExe.Text.Trim();
         var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
         SandboxStatus.Text = string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved)
-            ? "Sandboxie: not found. Use the download button below, then Browse to Start.exe."
-            : $"Sandboxie: found at {resolved}. Boxes live under {ProcessSessionService.GetBoxesRoot()}.";
+            ? Strings.SandboxStatusNone
+            : L10n.Fmt(Strings.SandboxStatusOk, resolved, ProcessSessionService.GetBoxesRoot());
     }
 
     private void DownloadSandboxie_Click(object sender, RoutedEventArgs e)
@@ -85,7 +115,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to open the download page.\n\n{ex.Message}", "Download", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(L10n.Fmt(Strings.MsgDownloadFailed, Environment.NewLine, ex.Message), Strings.DownloadTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -95,7 +125,7 @@ public partial class SettingsWindow : Window
         var startExe = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
         if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
         {
-            MessageBox.Show("Sandboxie Start.exe was not found. Install Sandboxie-Plus first.", "Create Boxes", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgCreateBoxesNoExe, Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -117,9 +147,9 @@ public partial class SettingsWindow : Window
         App.Db.Log("INFO", $"Created {ok} Sandboxie box(es).");
         MessageBox.Show(
             failures.Count == 0
-                ? $"Created {ok} Sandboxie box(es). Accounts can now run simultaneously."
-                : $"Created {ok} box(es). Failures:\n\n{string.Join("\n", failures)}",
-            "Create Boxes",
+                ? L10n.Fmt(Strings.BoxesDone, ok)
+                : L10n.Fmt(Strings.BoxesDoneFailures, ok, Environment.NewLine, string.Join(Environment.NewLine, failures)),
+            Strings.TitleCreateBoxes,
             MessageBoxButton.OK,
             failures.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         UpdateSandboxStatus();
@@ -134,7 +164,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to open data folder.\n\n{ex.Message}", "Open Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(L10n.Fmt(Strings.MsgOpenFolderFailed, Environment.NewLine, ex.Message), Strings.TitleOpenFolder, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -151,11 +181,11 @@ public partial class SettingsWindow : Window
         {
             BackupService.CreateBackup(App.Paths, dialog.FileName);
             App.Db.Log("INFO", $"Data backed up to '{dialog.FileName}'.");
-            MessageBox.Show($"Backup saved.\n\n{dialog.FileName}\n\nIncludes database, secrets, and settings. Profile directories are excluded.", "Backup", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(L10n.Fmt(Strings.BackupSavedBody, Environment.NewLine, dialog.FileName), Strings.TitleBackup, MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to create backup.\n\n{ex.Message}", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgBackupFailed, Environment.NewLine, ex.Message), Strings.TitleBackupError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -165,8 +195,8 @@ public partial class SettingsWindow : Window
         if (dialog.ShowDialog(this) != true)
             return;
         var confirm = MessageBox.Show(
-            "Restore replaces the current database, secrets, and settings. Stop all running clients first.\n\nContinue?",
-            "Confirm Restore",
+            L10n.Fmt(Strings.MsgConfirmRestore, Environment.NewLine),
+            Strings.TitleConfirmRestore,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes)
@@ -180,12 +210,12 @@ public partial class SettingsWindow : Window
             }
             BackupService.RestoreBackup(App.Paths, dialog.FileName);
             App.Db.Log("INFO", $"Data restored from '{dialog.FileName}'.");
-            MessageBox.Show("Restore complete. The account list will refresh.", "Restore", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(Strings.RestoreDoneBody, Strings.TitleRestore, MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to restore backup.\n\n{ex.Message}", "Restore Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgRestoreFailed, Environment.NewLine, ex.Message), Strings.TitleRestoreError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -197,19 +227,21 @@ public partial class SettingsWindow : Window
         var template = Args.Text.Trim();
         var useSandboxie = SandboxBox.IsChecked == true;
         var sandboxExe = SandboxExe.Text.Trim();
-        if (!int.TryParse(BackupDays.Text.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var backupDays) || backupDays < 0 || backupDays > 365)
+        var language = (LanguageBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "en";
+        language = NormalizeLanguage(language);
+        if (!int.TryParse(BackupDays.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var backupDays) || backupDays < 0 || backupDays > 365)
         {
-            MessageBox.Show("Auto-backup interval must be a number from 0 to 365 (0 = off).", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgBackupDaysInvalid, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        if (!int.TryParse(BackupKeep.Text.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var backupKeep) || backupKeep < 1 || backupKeep > 100)
+        if (!int.TryParse(BackupKeep.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var backupKeep) || backupKeep < 1 || backupKeep > 100)
         {
-            MessageBox.Show("Backups to keep must be a number from 1 to 100.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgBackupKeepInvalid, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (!string.IsNullOrWhiteSpace(executable) && !File.Exists(executable))
         {
-            MessageBox.Show("The selected executable does not exist.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgExeNotFound, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (useSandboxie)
@@ -217,7 +249,7 @@ public partial class SettingsWindow : Window
             var resolved = string.IsNullOrWhiteSpace(sandboxExe) ? ProcessSessionService.FindSandboxieStart() : sandboxExe;
             if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
             {
-                MessageBox.Show("Sandboxie is enabled but Start.exe was not found. Install Sandboxie-Plus or set its path.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Strings.MsgSandboxieMissing, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
         }
@@ -225,8 +257,8 @@ public partial class SettingsWindow : Window
         if (warnings.Count > 0)
         {
             var result = MessageBox.Show(
-                $"Arguments template has warnings:\n\n{string.Join("\n", warnings)}\n\nSave anyway?",
-                "Template Warning",
+                L10n.Fmt(Strings.MsgTemplateWarning, Environment.NewLine, string.Join(Environment.NewLine, warnings)),
+                Strings.TitleTemplateWarning,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes)
@@ -235,13 +267,16 @@ public partial class SettingsWindow : Window
         try
         {
             var current = App.Settings.Load();
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc });
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc, Language = language });
             App.Db.Log("INFO", "Settings saved.");
+            if (!string.Equals(language, _initialLanguage, StringComparison.OrdinalIgnoreCase))
+                MessageBox.Show(Strings.MsgRestartRequired, Strings.TitleLanguage, MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to save settings.\n\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgSaveSettingsFailed, Environment.NewLine, ex.Message), Strings.TitleSaveError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
+

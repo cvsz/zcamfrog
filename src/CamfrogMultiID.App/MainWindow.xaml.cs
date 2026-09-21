@@ -1,5 +1,6 @@
-using CamfrogMultiID.Infrastructure;
+﻿using CamfrogMultiID.Infrastructure;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -174,7 +175,7 @@ public partial class MainWindow : Window
             // kill the UI timer loop. Keep the previous grid state and record the
             // failure for diagnosis.
             try { App.Db?.Log("ERROR", $"Refresh failed: {ex.Message}"); } catch { }
-            try { StatusCounts.Text = $"Refresh failed: {ex.Message}"; } catch { }
+            try { StatusCounts.Text = L10n.Fmt(Strings.StatusRefreshFailed, ex.Message); } catch { }
         }
         finally
         {
@@ -188,7 +189,7 @@ public partial class MainWindow : Window
     {
         if (AccountsGrid.SelectedItem is not CamfrogAccount account)
         {
-            DetailsBox.Text = "Select an account to see isolation details and launch preview.";
+            DetailsBox.Text = Strings.DetailsSelectPrompt;
             return;
         }
 
@@ -196,22 +197,22 @@ public partial class MainWindow : Window
         var preview = ProcessSessionService.PreviewLaunch(settings, account);
         var secretExists = App.Credentials.Exists(account.PasswordSecretName);
         var profileExists = Directory.Exists(account.ProfileDirectory);
-        var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+        var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "โ€”";
         var uptime = account.StartedAtUtc is DateTime started && account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase)
             ? FormatDuration(DateTime.UtcNow - started.ToUniversalTime())
-            : "—";
+            : "โ€”";
         var restarts = _restartPolicy.GetAttemptCount(account.Id, DateTime.UtcNow);
         var passwordAge = account.PasswordChangedUtc is DateTime changed
             ? $"{(int)(DateTime.UtcNow - changed.ToUniversalTime()).TotalDays}d" + ((DateTime.UtcNow - changed.ToUniversalTime()).TotalDays > 90 ? " (rotation recommended)" : string.Empty)
             : "unknown";
         DetailsBox.Text =
             $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}  AutoRestart: {account.AutoRestart}\n" +
-            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—")}  Local: {startedLocal}  Uptime: {uptime}  Restarts(10m): {restarts}\n" +
+            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "โ€”")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "โ€”")}  Local: {startedLocal}  Uptime: {uptime}  Restarts(10m): {restarts}\n" +
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
-            $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—" : account.ProcessExecutablePath)}\n" +
-            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—" : account.RoomUrl)}  Password age: {passwordAge}\n" +
+            $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "โ€”" : account.ProcessExecutablePath)}\n" +
+            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "โ€”" : account.RoomUrl)}  Password age: {passwordAge}\n" +
             (settings.UseSandboxie
-                ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created — use Settings]")}\n"
+                ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created โ€” use Settings]")}\n"
                 : string.Empty) +
             $"Launch: {preview}";
     }
@@ -232,14 +233,14 @@ public partial class MainWindow : Window
         var running = all.Count(a => a.Status.Equals("Running", StringComparison.OrdinalIgnoreCase));
         var err = all.Count(a => a.Status.Equals("Error", StringComparison.OrdinalIgnoreCase));
         var disabled = all.Count(a => !a.Enabled);
-        StatusCounts.Text = $"Accounts: {all.Count}  Running: {running}  Error: {err}  Disabled: {disabled}";
+        StatusCounts.Text = L10n.Fmt(Strings.StatusCounts, all.Count, running, err, disabled);
 
         var settings = App.Settings.Load();
         StatusClient.Text = string.IsNullOrWhiteSpace(settings.ClientExecutable)
-            ? "Client: not configured (open Settings)"
+            ? Strings.ClientNone
             : File.Exists(settings.ClientExecutable)
-                ? $"Client: {settings.ClientExecutable}"
-                : $"Client: missing — {settings.ClientExecutable}";
+                ? L10n.Fmt(Strings.ClientOk, settings.ClientExecutable)
+                : L10n.Fmt(Strings.ClientMissing, settings.ClientExecutable);
     }
 
     private void UpdateLogBox()
@@ -282,14 +283,14 @@ public partial class MainWindow : Window
         var account = SelectedAccount();
         if (account is null)
         {
-            MessageBox.Show("Please select an account first.", "Edit Account",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleEditAccount,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         var fresh = App.Db.GetById(account.Id);
         if (fresh is null)
         {
-            MessageBox.Show("The selected account no longer exists.", "Edit Account",
+            MessageBox.Show(Strings.MsgAccountGone, Strings.TitleEditAccount,
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             RefreshRuntimeState();
             return;
@@ -305,7 +306,7 @@ public partial class MainWindow : Window
         var account = SelectedAccount();
         if (account is null)
         {
-            MessageBox.Show("Please select an account first.", "Delete Account",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleDeleteAccount,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -318,8 +319,8 @@ public partial class MainWindow : Window
         }
 
         var confirm = MessageBox.Show(
-            $"Delete account '{fresh.DisplayName}' ({fresh.Username})?\n\nThis removes the database row, DPAPI secret, and profile directory. This cannot be undone.",
-            "Confirm Delete",
+            L10n.Fmt(Strings.MsgConfirmDelete, Environment.NewLine, fresh.DisplayName, fresh.Username),
+            Strings.TitleConfirmDelete,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes)
@@ -352,8 +353,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to delete '{account.DisplayName}'.\n\n{ex.Message}",
-                "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgDeleteFailed, account.DisplayName, Environment.NewLine, ex.Message),
+                Strings.TitleDeleteError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -366,7 +367,7 @@ public partial class MainWindow : Window
         var account = SelectedAccount();
         if (account is null)
         {
-            MessageBox.Show("Please select an account first.", "Enable/Disable",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleEnableDisable,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -377,8 +378,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to update '{account.DisplayName}'.\n\n{ex.Message}",
-                "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgUpdateFailed, account.DisplayName, Environment.NewLine, ex.Message),
+                Strings.TitleUpdateError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -391,7 +392,7 @@ public partial class MainWindow : Window
         var account = SelectedAccount();
         if (account is null)
         {
-            MessageBox.Show("Please select an account first.", "Change Password",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleChangePassword,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -403,13 +404,13 @@ public partial class MainWindow : Window
                 App.Credentials.Save(account.PasswordSecretName, dialog.NewPassword);
                 App.Db.SetPasswordChanged(account.Id, DateTime.UtcNow);
                 App.Db.Log("INFO", $"Password updated for '{account.DisplayName}'.");
-                MessageBox.Show("Password updated (DPAPI protected).", "Change Password",
+                MessageBox.Show(Strings.MsgPasswordUpdated, Strings.TitleChangePassword,
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Unable to update password.\n\n{ex.Message}",
-                    "Change Password", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(L10n.Fmt(Strings.MsgPasswordUpdateFailed, Environment.NewLine, ex.Message),
+                    Strings.TitleChangePassword, MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
@@ -419,7 +420,7 @@ public partial class MainWindow : Window
         var account = SelectedAccount();
         if (account is null)
         {
-            MessageBox.Show("Please select an account first.", "Clear Error",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleClearError,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -442,7 +443,7 @@ public partial class MainWindow : Window
         var source = Path.Combine(App.Paths.Logs, "app.log");
         if (!File.Exists(source))
         {
-            MessageBox.Show("No log file exists yet.", "Export Log",
+            MessageBox.Show(Strings.MsgNoLogFile, Strings.ExportLog,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -460,7 +461,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to export log.\n\n{ex.Message}", "Export Log",
+            MessageBox.Show(L10n.Fmt(Strings.MsgExportLogFailed, Environment.NewLine, ex.Message), Strings.ExportLog,
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -479,13 +480,13 @@ public partial class MainWindow : Window
             DiagnosticsService.ExportBundle(App.Paths, App.Db, dialog.FileName);
             App.Db.Log("INFO", $"Diagnostics bundle exported to '{dialog.FileName}'.");
             MessageBox.Show(
-                $"Diagnostics bundle saved.\n\n{dialog.FileName}\n\nContains versions, account counts (no usernames), log, and settings. No passwords or secrets are included.",
-                "Diagnostics",
+                L10n.Fmt(Strings.MsgDiagnosticsDone, Environment.NewLine, dialog.FileName),
+                Strings.Diagnostics,
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to export diagnostics.\n\n{ex.Message}", "Diagnostics",
+            MessageBox.Show(L10n.Fmt(Strings.MsgDiagnosticsFailed, Environment.NewLine, ex.Message), Strings.TitleDiagnosticsError,
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -499,7 +500,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to open log folder.\n\n{ex.Message}", "Logs",
+            MessageBox.Show(L10n.Fmt(Strings.MsgOpenLogFolderFailed, Environment.NewLine, ex.Message), Strings.TitleLogs,
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -511,7 +512,7 @@ public partial class MainWindow : Window
         if (SelectedAccount() is CamfrogAccount account)
             StartAccount(account);
         else
-            MessageBox.Show("Please select an account first.", "Start Account",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleStartAccount,
                 MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -520,7 +521,7 @@ public partial class MainWindow : Window
         if (SelectedAccount() is CamfrogAccount account)
             StopAccount(account);
         else
-            MessageBox.Show("Please select an account first.", "Stop Account",
+            MessageBox.Show(Strings.MsgSelectAccount, Strings.TitleStopAccount,
                 MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -529,13 +530,13 @@ public partial class MainWindow : Window
         var enabled = App.Db.GetAccounts().Where(a => a.Enabled).ToList();
         if (enabled.Count == 0)
         {
-            MessageBox.Show("No enabled accounts to start.", "Start All",
+            MessageBox.Show(Strings.MsgNoEnabledAccounts, Strings.TitleStartAll,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         var confirm = MessageBox.Show(
-            $"Start {enabled.Count} enabled account(s)?\n\nVerify individual launch first; the client may ignore {{profile}} isolation.",
-            "Confirm Start All",
+            L10n.Fmt(Strings.MsgConfirmStartAll, enabled.Count, Environment.NewLine),
+            Strings.TitleConfirmStartAll,
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes)
@@ -554,8 +555,8 @@ public partial class MainWindow : Window
         if (all.Count == 0)
             return;
         var confirm = MessageBox.Show(
-            $"Stop all {all.Count} account(s)?",
-            "Confirm Stop All",
+            L10n.Fmt(Strings.MsgConfirmStopAll, all.Count),
+            Strings.TitleConfirmStopAll,
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes)
@@ -593,8 +594,8 @@ public partial class MainWindow : Window
             if (interactive)
             {
                 MessageBox.Show(
-                    $"Unable to start '{account.DisplayName}'.\n\n{ex.Message}",
-                    "Start Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    L10n.Fmt(Strings.MsgStartFailed, account.DisplayName, Environment.NewLine, ex.Message),
+                    Strings.TitleStartError, MessageBoxButton.OK, MessageBoxImage.Error);
             }
             return false;
         }
@@ -612,8 +613,9 @@ public partial class MainWindow : Window
             App.Db.UpdateRuntime(account.Id, "Error", null, null, ex.Message);
             App.Db.Log("ERROR", $"{account.DisplayName}: {ex.Message}");
             MessageBox.Show(
-                $"Unable to stop '{account.DisplayName}'.\n\n{ex.Message}",
-                "Stop Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                L10n.Fmt(Strings.MsgStopFailed, account.DisplayName, Environment.NewLine, ex.Message),
+                Strings.TitleStopError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
+

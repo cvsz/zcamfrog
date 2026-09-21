@@ -22,7 +22,7 @@
 - [x] Scheduled backups with pruning
 - [~] Installer: `package-msix.ps1` path-ready (needs Windows SDK + cert; unverified here, zip stays primary)
 - [ ] Telemetry: networked opt-in diagnostics (no discretionary need while local bundle exists)
-- [ ] Localization (resources)
+- [x] Localization: English + Thai via resx, language setting with restart notice, completeness test over all keys
 
 ## Future considerations
 - [ ] Support for Camfrog client variants (if documented CLI changes)

@@ -24,6 +24,7 @@ First tagged release. Published via the release workflow with `CamfrogMultiID-v1
 - Health: uptime + restart-window counts in details; password-age with 90-day rotation notice (`password_changed_utc` migration)
 - Scheduled auto-backups (configurable days/keep, prune, startup-safe) + diagnostics bundle export (no secrets/usernames, no network)
 - `package-msix.ps1` path-ready (SDK-gated, unverified locally); release attestation bumped to v4 (Dependabot, merged)
+- Localization: English + Thai (152 resx keys, hand-written accessor without designer dependency, `x:Static` XAML, `Language` setting, startup `CurrentUICulture`, `L10n.Fmt` helper satisfying CA1863/CA1304); real-process start/stop test via cmd fake client
 - `tests/CamfrogMultiID.Tests` (xUnit, 39 tests): DatabaseService, CredentialService, SettingsService, ProcessSessionService (PID reuse, quoting, concurrency)
 - CI `build` job on `windows-latest` (.NET 8): restore, Debug, Release, test, publish `win-x64` self-contained, artifact upload
 - CodeQL matrix for `csharp` (windows) and `actions` (ubuntu), `setup-dotnet`, manual build

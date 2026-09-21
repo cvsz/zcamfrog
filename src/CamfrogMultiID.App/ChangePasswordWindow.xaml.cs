@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using System.Windows;
 
 namespace CamfrogMultiID.App;
@@ -9,7 +10,7 @@ public partial class ChangePasswordWindow : Window
     public ChangePasswordWindow(string displayName)
     {
         InitializeComponent();
-        AccountLabel.Text = $"Account: {displayName}";
+        AccountLabel.Text = L10n.Fmt(Strings.AccountPrefix, displayName);
         NewPasswordBox.Focus();
     }
 
@@ -19,7 +20,7 @@ public partial class ChangePasswordWindow : Window
     {
         if (string.IsNullOrEmpty(NewPasswordBox.Password))
         {
-            MessageBox.Show("Please enter a new password.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgEnterNewPassword, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             NewPasswordBox.Focus();
             return;
         }
@@ -27,3 +28,4 @@ public partial class ChangePasswordWindow : Window
         DialogResult = true;
     }
 }
+

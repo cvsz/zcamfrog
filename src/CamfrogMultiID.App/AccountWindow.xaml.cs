@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using System.IO;
 using System.Windows;
 using CamfrogMultiID.Core;
@@ -15,15 +16,15 @@ public partial class AccountWindow : Window
     {
         ArgumentNullException.ThrowIfNull(existing);
         _editing = existing;
-        Title = $"Edit Account — {existing.DisplayName}";
+        Title = $"{Strings.TitleEditAccount} โ€” {existing.DisplayName}";
         DisplayNameTextBox.Text = existing.DisplayName;
         UsernameTextBox.Text = existing.Username;
         RoomUrlTextBox.Text = existing.RoomUrl;
         EnabledCheckBox.IsChecked = existing.Enabled;
         AutoRestartCheckBox.IsChecked = existing.AutoRestart;
-        PasswordLabel.Text = "New password (leave blank to keep current)";
-        PasswordHint.Text = "Leave blank to keep the stored DPAPI password. Enter a value to replace it.";
-        EditHint.Text = $"Profile: {existing.ProfileDirectory}";
+        PasswordLabel.Text = Strings.NewPasswordTitle;
+        PasswordHint.Text = Strings.PasswordHintEdit;
+        EditHint.Text = $"{existing.ProfileDirectory}";
         EditHint.Visibility = Visibility.Visible;
     }
 
@@ -38,31 +39,31 @@ public partial class AccountWindow : Window
 
         if (string.IsNullOrWhiteSpace(displayName))
         {
-            MessageBox.Show("Please enter a display name.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgEnterDisplayName, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             DisplayNameTextBox.Focus();
             return;
         }
         if (displayName.Length > 80)
         {
-            MessageBox.Show("Display name is too long (max 80 characters).", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgDisplayNameTooLong, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             DisplayNameTextBox.Focus();
             return;
         }
         if (string.IsNullOrWhiteSpace(username))
         {
-            MessageBox.Show("Please enter a username.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgEnterUsername, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             UsernameTextBox.Focus();
             return;
         }
         if (username.Length > 80)
         {
-            MessageBox.Show("Username is too long (max 80 characters).", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgUsernameTooLong, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             UsernameTextBox.Focus();
             return;
         }
         if (!isEdit && string.IsNullOrEmpty(password))
         {
-            MessageBox.Show("Please enter a password.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Strings.MsgEnterPassword, Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
             PasswordInput.Focus();
             return;
         }
@@ -78,7 +79,7 @@ public partial class AccountWindow : Window
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Invalid room URL.\n\n{ex.Message}", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(L10n.Fmt(Strings.MsgInvalidRoomUrl, Environment.NewLine, ex.Message), Strings.TitleValidation, MessageBoxButton.OK, MessageBoxImage.Warning);
                 RoomUrlTextBox.Focus();
                 return;
             }
@@ -90,7 +91,7 @@ public partial class AccountWindow : Window
             {
                 if (App.Db.UsernameExists(username))
                 {
-                    MessageBox.Show("An account with this username already exists.", "Duplicate Account", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Strings.MsgDuplicateAccount, Strings.TitleDuplicateAccount, MessageBoxButton.OK, MessageBoxImage.Warning);
                     UsernameTextBox.Focus();
                     return;
                 }
@@ -121,7 +122,7 @@ public partial class AccountWindow : Window
                 {
                     try { File.Delete(Path.Combine(App.Paths.Secrets, secret + ".bin")); } catch { }
                     try { Directory.Delete(profile, true); } catch { }
-                    MessageBox.Show($"Unable to save the account.\n\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(L10n.Fmt(Strings.MsgSaveAccountFailed, Environment.NewLine, ex.Message), Strings.TitleSaveError, MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
@@ -129,7 +130,7 @@ public partial class AccountWindow : Window
                 var existing = _editing!;
                 if (App.Db.UsernameExistsExcept(username, existing.Id))
                 {
-                    MessageBox.Show("An account with this username already exists.", "Duplicate Account", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Strings.MsgDuplicateAccount, Strings.TitleDuplicateAccount, MessageBoxButton.OK, MessageBoxImage.Warning);
                     UsernameTextBox.Focus();
                     return;
                 }
@@ -149,7 +150,8 @@ public partial class AccountWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to save the account.\n\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(L10n.Fmt(Strings.MsgSaveAccountFailed, Environment.NewLine, ex.Message), Strings.TitleSaveError, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
+
