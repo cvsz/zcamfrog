@@ -479,4 +479,10 @@
   <data name="TitleConfirmStopAll" xml:space="preserve">
     <value>ยืนยันหยุดทั้งหมด</value>
   </data>
+  <data name="TitleForeignClient" xml:space="preserve">
+    <value>มีไคลเอนต์อื่นรันอยู่</value>
+  </data>
+  <data name="MsgForeignClient" xml:space="preserve">
+    <value>มีไคลเอนต์ Camfrog อื่นรันอยู่นอกตัวจัดการ (PID {0}){1}{1}การเริ่มใหม่อาจออกทันที เพราะไคลเอนต์รันได้ทีละตัว กรุณาปิดตัวนั้นก่อน (ดูที่ system tray — การปิดหน้าต่างอาจแค่ย่อไว้){1}{1}ยังจะเริ่มอยู่หรือไม่?</value>
+  </data>
 </root>

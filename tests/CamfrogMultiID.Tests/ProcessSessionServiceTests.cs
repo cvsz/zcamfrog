@@ -129,6 +129,28 @@ public sealed class ProcessSessionServiceTests : IDisposable
     }
 
     [Fact]
+    public void FindForeignClientProcesses_InvalidInput_ReturnsEmpty()
+    {
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(""));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses("   "));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(null!));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(Path.Combine(_tempRoot, "no-such-app-xyz.exe")));
+    }
+
+    [Fact]
+    public void FindForeignClientProcesses_FindsSelfUnlessExcluded()
+    {
+        using var self = Process.GetCurrentProcess();
+        var exe = self.MainModule?.FileName;
+        if (string.IsNullOrWhiteSpace(exe))
+            return;
+        var all = ProcessSessionService.FindForeignClientProcesses(exe, null);
+        Assert.Contains(all, f => f.ProcessId == self.Id);
+        var excluded = ProcessSessionService.FindForeignClientProcesses(exe, self.Id);
+        Assert.DoesNotContain(excluded, f => f.ProcessId == self.Id);
+    }
+
+    [Fact]
     public void Start_MissingExecutable_Throws()
     {
         var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_tempRoot, "p1") };

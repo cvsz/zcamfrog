@@ -3,6 +3,10 @@
 All notable changes to Camfrog Multi-ID Manager are documented here. Based on Keep a Changelog and Semantic Versioning.
 
 ## [Unreleased]
+### Added
+- Pre-start foreign-client warning: starting while an untracked copy of the client runs now asks first (single-instance handoff exits in ~1s otherwise); tray-minimized copies called out explicitly
+- `FindForeignClientProcesses` (identity-verified, warning-only, never kills) + Thai/English strings
+
 ### Fixed
 - Issue template security URL pointed at the `ztemplate` template repo; now `zcamfrog`
 - `IMPLEMENTATION-CHECKLIST.md` rewritten from generic template to project-specific gates

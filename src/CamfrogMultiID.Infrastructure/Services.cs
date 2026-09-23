@@ -832,6 +832,68 @@ public sealed class ProcessSessionService
         return base_name;
     }
 
+    public sealed record ForeignProcess(int ProcessId, string ExecutablePath, DateTime StartTimeUtc);
+
+    /// <summary>
+    /// Finds client processes that the manager does not track (e.g. a copy
+    /// the user started by hand). A second launch while one of these lives
+    /// typically hands off and exits within seconds because the Camfrog
+    /// client is single-instance per session. Warning-only: the caller
+    /// decides; never kills anything here.
+    /// </summary>
+    public static IReadOnlyList<ForeignProcess> FindForeignClientProcesses(string executablePath, int? excludePid = null)
+    {
+        var result = new List<ForeignProcess>();
+        if (string.IsNullOrWhiteSpace(executablePath))
+            return result;
+        string processName;
+        string expectedFullPath;
+        try
+        {
+            expectedFullPath = Path.GetFullPath(executablePath);
+            processName = Path.GetFileNameWithoutExtension(expectedFullPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return result;
+        }
+        if (string.IsNullOrWhiteSpace(processName))
+            return result;
+
+        Process[] candidates;
+        try { candidates = Process.GetProcessesByName(processName); }
+        catch (InvalidOperationException) { return result; }
+
+        foreach (var candidate in candidates)
+        {
+            using (candidate)
+            {
+                try
+                {
+                    if (candidate.HasExited)
+                        continue;
+                    if (excludePid is int excluded && candidate.Id == excluded)
+                        continue;
+                    string actualPath;
+                    try { actualPath = candidate.MainModule?.FileName ?? string.Empty; }
+                    catch (InvalidOperationException) { continue; }
+                    catch (System.ComponentModel.Win32Exception) { continue; }
+                    if (!string.IsNullOrWhiteSpace(actualPath) &&
+                        !string.Equals(Path.GetFullPath(actualPath), expectedFullPath, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    DateTime started;
+                    try { started = candidate.StartTime.ToUniversalTime(); }
+                    catch (InvalidOperationException) { continue; }
+                    catch (System.ComponentModel.Win32Exception) { continue; }
+                    result.Add(new ForeignProcess(candidate.Id, actualPath, started));
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            }
+        }
+        return result;
+    }
+
     public static string? FindSandboxieStart()
     {
         string[] candidates =

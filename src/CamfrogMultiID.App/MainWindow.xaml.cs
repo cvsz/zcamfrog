@@ -583,6 +583,22 @@ public partial class MainWindow : Window
                 App.Db.UpdateRuntime(account.Id, "Stopped", null, null);
             }
 
+            if (interactive && !settings.UseSandboxie && !string.IsNullOrWhiteSpace(settings.ClientExecutable))
+            {
+                var foreign = ProcessSessionService.FindForeignClientProcesses(settings.ClientExecutable, account.ProcessId);
+                if (foreign.Count > 0)
+                {
+                    App.Db.Log("WARN", $"{account.DisplayName}: untracked client already running (PID {foreign[0].ProcessId}).");
+                    var answer = MessageBox.Show(
+                        L10n.Fmt(Strings.MsgForeignClient, foreign[0].ProcessId, Environment.NewLine),
+                        Strings.TitleForeignClient,
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+                    if (answer != MessageBoxResult.Yes)
+                        return false;
+                }
+            }
+
             App.Sessions.Start(account, settings);
             _restartPolicy.Reset(account.Id);
             return true;
