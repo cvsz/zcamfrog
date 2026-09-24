@@ -159,6 +159,35 @@ public sealed class ProcessSessionServiceTests : IDisposable
     }
 
     [Fact]
+    public void Start_SandboxieWithoutStartExe_Throws()
+    {
+        var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_tempRoot, "p_sbx") };
+        var settings = new AppSettings
+        {
+            ClientExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
+            UseSandboxie = true,
+            SandboxieStartExe = Path.Combine(_tempRoot, "missing-start.exe")
+        };
+        Assert.Throws<FileNotFoundException>(() => _svc.Start(acc, settings));
+    }
+
+    [Fact]
+    public void Start_InvalidRoomUrl_Throws()
+    {
+        var acc = new CamfrogAccount
+        {
+            Id = 1,
+            ProfileDirectory = Path.Combine(_tempRoot, "p_room"),
+            RoomUrl = "https://example.com/not-camfrog"
+        };
+        var settings = new AppSettings
+        {
+            ClientExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")
+        };
+        Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
+    }
+
+    [Fact]
     public void Start_NonExistentFile_Throws()
     {
         var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_tempRoot, "p2") };

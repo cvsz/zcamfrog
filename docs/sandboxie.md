@@ -23,6 +23,21 @@ Per account start with sandboxing enabled:
 Start.exe /wait /Box:<sanitized-username> "<client.exe>" <args> [--url="<room>"]
 ```
 
+Box names are passed **unquoted** (the sanitizer emits letters/digits
+only, max 32 chars, matching Sandboxie's own naming rule).
+
+## "Invalid box name parameter" (Sbie message 3204)
+Start.exe reports this when the named box does not exist in the
+Sandboxie configuration — e.g. launching with a hand-typed box name, or
+after deleting the box externally. It is not (only) about illegal
+characters: even `DefaultBox` triggers it when the config is missing.
+
+The manager therefore ensures the box exists on every sandboxed start
+(idempotent `Start.exe /Box:<name> cmd.exe /c exit`) before launching
+the client. If that fails, start aborts with the Sandboxie error
+instead of a bare 3204 popup. Use Settings → "Create Boxes For All
+Accounts" to pre-create boxes and surface service problems early.
+
 - `/wait` keeps `Start.exe` alive while the sandboxed client runs, so
   the tracked PID stays valid for PID/start-time/executable checks
   (which then apply to `Start.exe` itself).

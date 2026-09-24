@@ -208,11 +208,23 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
-    public void BuildCreateBoxArguments_QuotesBox()
+    public void BuildCreateBoxArguments_PassesBoxUnquoted()
     {
-        var args = ProcessSessionService.BuildCreateBoxArguments("My Box");
-        Assert.Contains("/Box:", args);
-        Assert.Contains("cmd.exe", args);
+        // Sandboxie's parser rejects quoted box names (Sbie 3204), and
+        // SanitizeBoxName output never needs quoting anyway.
+        var args = ProcessSessionService.BuildCreateBoxArguments("MyBox");
+        Assert.Contains("/Box:MyBox ", args, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"MyBox\"", args, StringComparison.Ordinal);
+        Assert.Contains("cmd.exe", args, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PreviewLaunch_ShowsUnquotedBox()
+    {
+        var acc = new CamfrogAccount { Id = 1, Username = "u1", ProfileDirectory = @"C:\p\1" };
+        var cmd = ProcessSessionService.PreviewLaunch(
+            new AppSettings { ClientExecutable = @"C:\c.exe", UseSandboxie = true, SandboxieStartExe = @"C:\sb\Start.exe" }, acc);
+        Assert.Contains("/Box:u1 ", cmd);
     }
 
     [Fact]

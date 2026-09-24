@@ -606,12 +606,25 @@ public sealed class ProcessSessionService
             if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
                 throw new FileNotFoundException("Sandboxie Start.exe was not found. Install Sandboxie-Plus or configure its path in Settings.", startExe ?? string.Empty);
             trackedExecutable = startExe;
+            // Start.exe rejects unknown boxes ("Invalid box name parameter",
+            // Sbie message 3204), so ensure the box exists first. Creation is
+            // idempotent: an existing box is left untouched.
+            try
+            {
+                CreateBox(startExe, SanitizeBoxName(account));
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception)
+            {
+                throw new InvalidOperationException(
+                    $"Could not ensure Sandboxie box '{SanitizeBoxName(account)}'. " +
+                    "Create it via Settings, or verify the Sandboxie service is running.", ex);
+            }
             psi = new ProcessStartInfo
             {
                 FileName = startExe,
                 // /wait keeps Start.exe alive while the sandboxed client runs, so the
                 // tracked PID stays valid for the whole session.
-                Arguments = $"/wait /Box:{Quote(SanitizeBoxName(account))} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
+                Arguments = $"/wait /Box:{SanitizeBoxName(account)} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory
             };
@@ -807,7 +820,9 @@ public sealed class ProcessSessionService
         if (!settings.UseSandboxie)
             return inner;
         var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe) ? FindSandboxieStart() ?? "<Start.exe>" : settings.SandboxieStartExe;
-        return $"\"{startExe}\" /wait /Box:{Quote(SanitizeBoxName(account))} {inner}";
+        // Box names are sanitized to letters/digits only, so no quoting is
+        // needed (and Sandboxie's parser rejects quoted names).
+        return $"\"{startExe}\" /wait /Box:{SanitizeBoxName(account)} {inner}";
     }
 
     public static string NormalizeRoomUrl(string roomUrl)
@@ -951,7 +966,7 @@ public sealed class ProcessSessionService
     }
 
     public static string BuildCreateBoxArguments(string boxName) =>
-        $"/Box:{Quote(boxName)} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+        $"/Box:{boxName} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
 
     public static void CreateBox(string startExe, string boxName)
     {
