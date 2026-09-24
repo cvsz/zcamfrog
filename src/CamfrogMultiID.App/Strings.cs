@@ -164,6 +164,7 @@ public static class Strings
     public static string TitleConfirmStopAll => Manager.GetString("TitleConfirmStopAll", CultureInfo.CurrentUICulture) ?? "TitleConfirmStopAll";
     public static string TitleForeignClient => Manager.GetString("TitleForeignClient", CultureInfo.CurrentUICulture) ?? "TitleForeignClient";
     public static string MsgForeignClient => Manager.GetString("MsgForeignClient", CultureInfo.CurrentUICulture) ?? "MsgForeignClient";
+    public static string AutoStartAccounts => Manager.GetString("AutoStartAccounts", CultureInfo.CurrentUICulture) ?? "AutoStartAccounts";
 }
 
 /// <summary>Formats resource templates. A helper (rather than inline string.Format) because resource

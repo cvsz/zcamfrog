@@ -40,7 +40,46 @@ public partial class MainWindow : Window
     {
         RefreshRuntimeState();
         RunAutoBackupIfDue();
+        EnsureSandboxService();
+        AutoStartEnabledAccounts();
         _timer.Start();
+    }
+
+    private static void EnsureSandboxService()
+    {
+        try
+        {
+            if (!App.Settings.Load().UseSandboxie)
+                return;
+            if (ProcessSessionService.IsSandboxieReady(App.Settings.Load().SandboxieStartExe, out _))
+                return;
+            if (ProcessSessionService.TryStartSandboxieService(out var reason))
+                App.Db.Log("INFO", "SbieSvc service started automatically.");
+            else
+                App.Db.Log("WARN", $"Sandboxie service not running: {reason}");
+        }
+        catch (Exception ex)
+        {
+            try { App.Db?.Log("ERROR", $"Sandboxie auto-start failed: {ex.Message}"); } catch { }
+        }
+    }
+
+    private void AutoStartEnabledAccounts()
+    {
+        AppSettings settings;
+        try { settings = App.Settings.Load(); }
+        catch { return; }
+        if (!settings.AutoStartAccounts)
+            return;
+        List<CamfrogAccount> enabled;
+        try { enabled = App.Db.GetAccounts().Where(a => a.Enabled).ToList(); }
+        catch { return; }
+        if (enabled.Count == 0)
+            return;
+        App.Db.Log("INFO", $"Auto-starting {enabled.Count} enabled account(s).");
+        foreach (var account in enabled)
+            TryStartAccount(account, settings, interactive: false);
+        RefreshRuntimeState();
     }
 
     private static void RunAutoBackupIfDue()

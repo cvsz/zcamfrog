@@ -13,12 +13,14 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 
 ## [Unreleased]
 ### Added
+- Thai translation repair: 118 values damaged by an editing channel rewritten verified-clean (0 control chars, exact codepoints); regression test guards the class; Thai-capable font fallback on log/details panes
+- Auto-start: `AutoStartAccounts` setting starts enabled accounts silently at manager launch; `TryStartSandboxieService` best-effort SbieSvc start (elevation-gated) wired into startup when sandboxing is on
 - Account lifecycle: Edit (display/username/enabled + optional password replace), Delete with confirmation + secret/profile cleanup, Enable/Disable toggle, Change Password dialog, Clear Error
 - Main window: search/filter, selected-account details + launch preview, status bar (counts + client status), log level filter + tail 500 + auto-scroll + clear/open-folder, context menu, double-click edit, F5/Delete/Enter shortcuts, Start All / Stop All confirmations
 - Settings: exe existence status, template warning validation, data folder display + open-folder
 - Backend: `GetById`, `UpdateDetails`, `SetEnabled`, `Delete`, `ClearError`, `UsernameExistsExcept`, `CredentialService.Exists/Delete`, `PreviewCommandLine/PreviewArguments/ValidateArgumentsTemplate`
 - Dependencies (verified `net8.0-windows`): `Microsoft.Data.Sqlite` 8.0.30→10.0.12, `ProtectedData` 8.0.0→10.0.12, `Test.Sdk` 17.8.0→18.10.1, `coverlet` 6.0.0→10.0.1, `xunit` 2.5.3→2.9.3, `runner.visualstudio` 2.5.3→4.0.0; Actions `checkout` v4→v7, `setup-dotnet` v4→v6, `upload-artifact` v4→v7
-- Tests: 85 xUnit tests (DatabaseService, CredentialService, SettingsService, ProcessSessionService, backup, diagnostics, localization, restart policy)
+- Tests: 86 xUnit tests (DatabaseService, CredentialService, SettingsService, ProcessSessionService, backup, diagnostics, localization, restart policy)
 - Startup crash fix: guard `MainWindow` event handlers during `InitializeComponent` (`_initialized`), corrupt dates parse to null instead of throwing, refresh loop catches and logs instead of killing the UI
 - Sandbox multi-instance (experimental): optional Sandboxie-Plus launch per account (`Start.exe /wait /Box:<user>`, box name sanitized); env-redirection alone proven insufficient (client mutex)
 - Auto-join rooms: per-account `RoomUrl` (`camfrog:` scheme validated) appended as `--url=` (registry-verified client switch); launch preview shows full sandboxed command

@@ -485,4 +485,7 @@
   <data name="MsgForeignClient" xml:space="preserve">
     <value>Another Camfrog client is already running outside the manager (PID {0}).{1}{1}A new launch will likely exit immediately — the client is single-instance. Close the other copy first (check the system tray — closing the window may only minimize it).{1}{1}Start anyway?</value>
   </data>
+  <data name="AutoStartAccounts" xml:space="preserve">
+    <value>Start enabled accounts when the manager starts</value>
+  </data>
 </root>

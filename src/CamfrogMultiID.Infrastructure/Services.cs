@@ -987,6 +987,35 @@ public sealed class ProcessSessionService
         catch (System.ComponentModel.Win32Exception) { return false; }
     }
 
+    /// <summary>
+    /// Best-effort start of the Sandboxie service (requires elevation;
+    /// fails gracefully with a reason otherwise).
+    /// </summary>
+    public static bool TryStartSandboxieService(out string? reason)
+    {
+        reason = null;
+        try
+        {
+            using var service = new System.ServiceProcess.ServiceController("SbieSvc");
+            try { var _ = service.Status; }
+            catch (InvalidOperationException)
+            {
+                reason = "The SbieSvc service is not installed. Run the Sandboxie-Plus installer (as admin) first.";
+                return false;
+            }
+            if (service.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                return true;
+            service.Start();
+            service.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+            return service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or System.ServiceProcess.TimeoutException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            reason = $"Could not start the SbieSvc service ({ex.Message}). Run the manager as admin, or start it from services.msc.";
+            return false;
+        }
+    }
+
     public static string? GetSandboxieVersion(string? startExePath)
     {
         if (string.IsNullOrWhiteSpace(startExePath))

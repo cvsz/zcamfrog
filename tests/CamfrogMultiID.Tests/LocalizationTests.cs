@@ -34,6 +34,35 @@ public sealed class LocalizationTests
     }
 
     [Fact]
+    public void LoadedValues_ContainNoControlOrReplacementChars()
+    {
+        // Regression: an editing channel once wrote C1 controls into Thai
+        // values. Any such corruption must fail loudly here.
+        var properties = typeof(Strings).GetProperties(BindingFlags.Public | BindingFlags.Static)
+            .Where(p => p.PropertyType == typeof(string) && p.GetIndexParameters().Length == 0)
+            .ToList();
+        var original = CultureInfo.CurrentUICulture;
+        try
+        {
+            foreach (var culture in new[] { "en", "th" })
+            {
+                CultureInfo.CurrentUICulture = new CultureInfo(culture);
+                foreach (var property in properties)
+                {
+                    var value = (string?)property.GetValue(null) ?? string.Empty;
+                    Assert.DoesNotContain("\uFFFD", value);
+                    foreach (var ch in value)
+                        Assert.False(ch >= '\u0080' && ch <= '\u009F', $"{property.Name} [{culture}] contains U+{(int)ch:X4}");
+                }
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
     public void Thai_DiffersFromEnglish_ForTranslatedKeys()
     {
         var original = CultureInfo.CurrentUICulture;

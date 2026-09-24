@@ -24,6 +24,7 @@ public partial class SettingsWindow : Window
         SandboxExe.Text = settings.SandboxieStartExe;
         BackupDays.Text = settings.AutoBackupDays.ToString(CultureInfo.InvariantCulture);
         BackupKeep.Text = settings.AutoBackupKeepCount.ToString(CultureInfo.InvariantCulture);
+        AutoStartBox.IsChecked = settings.AutoStartAccounts;
         SelectLanguage(settings.Language);
         _initialLanguage = NormalizeLanguage(settings.Language);
         UpdateSandboxStatus();
@@ -274,7 +275,7 @@ public partial class SettingsWindow : Window
         try
         {
             var current = App.Settings.Load();
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc, Language = language });
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc, Language = language, AutoStartAccounts = AutoStartBox.IsChecked == true });
             App.Db.Log("INFO", "Settings saved.");
             if (!string.Equals(language, _initialLanguage, StringComparison.OrdinalIgnoreCase))
                 MessageBox.Show(Strings.MsgRestartRequired, Strings.TitleLanguage, MessageBoxButton.OK, MessageBoxImage.Information);
