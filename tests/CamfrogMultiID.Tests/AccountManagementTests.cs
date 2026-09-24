@@ -276,6 +276,21 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void RestartPolicy_BudgetSurvivesSuccessfulStarts()
+    {
+        // Regression for the auto-restart loop: the UI resets the budget only
+        // on manual start/stop. Simulates exit -> allow -> start ok, repeated,
+        // with no Reset in between (the automatic path).
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.True(policy.ShouldRestart(99, now.AddSeconds(i * 2)));
+        }
+        Assert.False(policy.ShouldRestart(99, now.AddSeconds(8)));
+    }
+
+    [Fact]
     public void RestartPolicy_TracksAccountsSeparately()
     {
         var policy = new RestartPolicy();

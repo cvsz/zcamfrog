@@ -8,6 +8,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - `FindForeignClientProcesses` (identity-verified, warning-only, never kills) + Thai/English strings
 
 ### Fixed
+- Auto-restart loop guard never tripped: the restart budget was reset on every successful (re)start, so a client exiting in ~2s restarted forever. Budget now resets only on manual start/stop; automatic restarts consume it (3 per 10 min, then pause with Error)
 - Issue template security URL pointed at the `ztemplate` template repo; now `zcamfrog`
 - `IMPLEMENTATION-CHECKLIST.md` rewritten from generic template to project-specific gates
 - README test count synchronized (79)

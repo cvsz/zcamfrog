@@ -568,10 +568,16 @@ public partial class MainWindow : Window
         RefreshRuntimeState();
     }
 
-    private void StartAccount(CamfrogAccount account, AppSettings? settings = null) =>
-        TryStartAccount(account, settings ?? App.Settings.Load(), interactive: true);
+    private void StartAccount(CamfrogAccount account, AppSettings? settings = null)
+    {
+        // Manual starts get a fresh restart budget; automatic restarts must
+        // consume it, otherwise a crashing client loops forever (each success
+        // would otherwise reset the window counter).
+        if (TryStartAccount(account, settings ?? App.Settings.Load(), interactive: true))
+            _restartPolicy.Reset(account.Id);
+    }
 
-    private bool TryStartAccount(CamfrogAccount account, AppSettings settings, bool interactive)
+    private static bool TryStartAccount(CamfrogAccount account, AppSettings settings, bool interactive)
     {
         try
         {
@@ -600,7 +606,6 @@ public partial class MainWindow : Window
             }
 
             App.Sessions.Start(account, settings);
-            _restartPolicy.Reset(account.Id);
             return true;
         }
         catch (Exception ex)
