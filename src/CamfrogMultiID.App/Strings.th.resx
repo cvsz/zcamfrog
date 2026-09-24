@@ -488,4 +488,10 @@
   <data name="AutoStartAccounts" xml:space="preserve">
     <value>เริ่มบัญชีที่เปิดใช้เมื่อเปิดโปรแกรม</value>
   </data>
+  <data name="BoxesNone" xml:space="preserve">
+    <value>ไม่มีบัญชีให้สร้าง Box</value>
+  </data>
+  <data name="BoxesElevationHint" xml:space="preserve">
+    <value>เคล็ดลับ: การสร้าง Box ต้องเขียนค่า Sandboxie ซึ่งต้องใช้สิทธิ์ผู้ดูแล รันตัวจัดการแบบผู้ดูแล หรือสร้าง Box ใน SandMan (แบบผู้ดูแล)</value>
+  </data>
 </root>

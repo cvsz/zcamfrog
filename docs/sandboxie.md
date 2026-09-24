@@ -55,6 +55,13 @@ Accounts" to pre-create boxes and surface service problems early.
 - Default boxes root: `C:\Sandbox\<WindowsUser>\<Box>` (overridable in
   tests via `CAMFROGMULTIID_SANDBOX_ROOT`).
 
+## Elevation requirement
+Creating a box writes the Sandboxie configuration and requires
+elevation. Either run the manager as administrator when pressing
+"Create Boxes For All Accounts", or create the boxes in SandMan
+(Run as administrator). Day-to-day Start/Stop works unelevated once
+the boxes exist.
+
 ## Manager surfaces
 - Settings: detection status (path, boxes root, `Start.exe` product
   version), download button, path override, box pre-creation.

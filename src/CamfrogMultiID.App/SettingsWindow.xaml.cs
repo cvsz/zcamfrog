@@ -155,8 +155,11 @@ public partial class SettingsWindow : Window
         App.Db.Log("INFO", $"Created {ok} Sandboxie box(es).");
         MessageBox.Show(
             failures.Count == 0
-                ? L10n.Fmt(Strings.BoxesDone, ok)
-                : L10n.Fmt(Strings.BoxesDoneFailures, ok, Environment.NewLine, string.Join(Environment.NewLine, failures)),
+                ? (ok == 0
+                    ? Strings.BoxesNone
+                    : L10n.Fmt(Strings.BoxesDone, ok))
+                : L10n.Fmt(Strings.BoxesDoneFailures, ok, Environment.NewLine, string.Join(Environment.NewLine, failures))
+                    + Environment.NewLine + Environment.NewLine + Strings.BoxesElevationHint,
             Strings.TitleCreateBoxes,
             MessageBoxButton.OK,
             failures.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);

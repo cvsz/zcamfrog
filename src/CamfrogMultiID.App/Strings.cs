@@ -165,6 +165,8 @@ public static class Strings
     public static string TitleForeignClient => Manager.GetString("TitleForeignClient", CultureInfo.CurrentUICulture) ?? "TitleForeignClient";
     public static string MsgForeignClient => Manager.GetString("MsgForeignClient", CultureInfo.CurrentUICulture) ?? "MsgForeignClient";
     public static string AutoStartAccounts => Manager.GetString("AutoStartAccounts", CultureInfo.CurrentUICulture) ?? "AutoStartAccounts";
+    public static string BoxesNone => Manager.GetString("BoxesNone", CultureInfo.CurrentUICulture) ?? "BoxesNone";
+    public static string BoxesElevationHint => Manager.GetString("BoxesElevationHint", CultureInfo.CurrentUICulture) ?? "BoxesElevationHint";
 }
 
 /// <summary>Formats resource templates. A helper (rather than inline string.Format) because resource

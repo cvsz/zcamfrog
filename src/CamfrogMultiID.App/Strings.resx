@@ -488,4 +488,10 @@
   <data name="AutoStartAccounts" xml:space="preserve">
     <value>Start enabled accounts when the manager starts</value>
   </data>
+  <data name="BoxesNone" xml:space="preserve">
+    <value>No accounts to create boxes for.</value>
+  </data>
+  <data name="BoxesElevationHint" xml:space="preserve">
+    <value>Tip: creating boxes writes the Sandboxie configuration, which requires elevation. Run the manager as administrator, or create the boxes in SandMan (as admin).</value>
+  </data>
 </root>
