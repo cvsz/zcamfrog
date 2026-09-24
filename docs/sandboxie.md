@@ -26,6 +26,13 @@ Start.exe /wait /Box:<sanitized-username> "<client.exe>" <args> [--url="<room>"]
 Box names are passed **unquoted** (the sanitizer emits letters/digits
 only, max 32 chars, matching Sandboxie's own naming rule).
 
+Source-verified in `Sandboxie/apps/start/start.cpp` (see
+`third_party/README.md` for the reference pin):
+`Parse_Command_Line` accepts only `[alphanumeric + _]` for the box
+name and a leading `"` resets it to empty; `Validate_Box_Name` then
+reports 3204 for anything `SbieApi_IsBoxEnabled` rejects. Quoted box
+names therefore always fail — the manager never quotes them.
+
 ## "Invalid box name parameter" (Sbie message 3204)
 Start.exe reports this when the named box does not exist in the
 Sandboxie configuration — e.g. launching with a hand-typed box name, or

@@ -168,7 +168,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
             UseSandboxie = true,
             SandboxieStartExe = Path.Combine(_tempRoot, "missing-start.exe")
         };
-        Assert.Throws<FileNotFoundException>(() => _svc.Start(acc, settings));
+        Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
     }
 
     [Fact]

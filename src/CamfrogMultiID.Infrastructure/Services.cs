@@ -600,11 +600,12 @@ public sealed class ProcessSessionService
         ProcessStartInfo psi;
         if (settings.UseSandboxie)
         {
-            var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
+            var configured = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
                 ? FindSandboxieStart()
-                : Path.GetFullPath(settings.SandboxieStartExe);
-            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
-                throw new FileNotFoundException("Sandboxie Start.exe was not found. Install Sandboxie-Plus or configure its path in Settings.", startExe ?? string.Empty);
+                : settings.SandboxieStartExe;
+            if (!IsSandboxieReady(configured, out var reason))
+                throw new InvalidOperationException($"Sandboxie is not ready: {reason}");
+            var startExe = Path.GetFullPath(configured!);
             trackedExecutable = startExe;
             // Start.exe rejects unknown boxes ("Invalid box name parameter",
             // Sbie message 3204), so ensure the box exists first. Creation is
@@ -927,6 +928,64 @@ public sealed class ProcessSessionService
 
     public const string SandboxieReleasesUrl = "https://github.com/sandboxie-plus/Sandboxie/releases";
     public const string SandboxieRepository = "https://github.com/sandboxie-plus/Sandboxie";
+
+    /// <summary>
+    /// Verifies Sandboxie can actually run boxes: Start.exe must exist and
+    /// the SbieSvc service must be installed and running (a bare file copy
+    /// without driver/service install fails every launch).
+    /// </summary>
+    public static bool IsSandboxieReady(string? configuredStartExe, out string? reason)
+    {
+        reason = null;
+        var startExe = string.IsNullOrWhiteSpace(configuredStartExe) ? FindSandboxieStart() : configuredStartExe;
+        if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+        {
+            reason = "Start.exe was not found.";
+            return false;
+        }
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\SbieSvc");
+            if (key is null)
+            {
+                reason = "The SbieSvc service is not installed. Run the Sandboxie-Plus installer (as admin) first.";
+                return false;
+            }
+        }
+        catch (System.Security.SecurityException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+        catch (IOException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+
+        if (!IsServiceRunning("SbieSvc"))
+        {
+            reason = "The SbieSvc service is installed but not running. Start it from services.msc (as admin).";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool IsServiceRunning(string serviceName)
+    {
+        try
+        {
+            using var service = new System.ServiceProcess.ServiceController(serviceName);
+            return service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+        }
+        catch (InvalidOperationException) { return false; }
+        catch (System.ComponentModel.Win32Exception) { return false; }
+    }
 
     public static string? GetSandboxieVersion(string? startExePath)
     {

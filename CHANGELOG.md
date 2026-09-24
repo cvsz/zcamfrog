@@ -10,6 +10,8 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 ### Fixed
 - Auto-restart loop guard never tripped: the restart budget was reset on every successful (re)start, so a client exiting in ~2s restarted forever. Budget now resets only on manual start/stop; automatic restarts consume it (3 per 10 min, then pause with Error)
 - Sandboxie "Invalid box name parameter" (Sbie 3204): box names are passed unquoted (parser rejects quotes), and Start now ensures the box exists first (idempotent pre-create) instead of assuming it; documented cause in `docs/sandboxie.md`
+- Sandboxie readiness gate: Start/Settings verify `Start.exe` plus the `SbieSvc` service (bare file copies without driver install now fail with a plain message); `System.ServiceProcess.ServiceController` 8.0.0 added
+- `third_party/` reference layout: Sandboxie `start.cpp` fetched for parser proof, GPL source gitignored, pin + re-fetch documented (full clone does not converge on this link)
 - Issue template security URL pointed at the `ztemplate` template repo; now `zcamfrog`
 - `IMPLEMENTATION-CHECKLIST.md` rewritten from generic template to project-specific gates
 - README test count synchronized (79)

@@ -101,12 +101,14 @@ public partial class SettingsWindow : Window
     private void UpdateSandboxStatus()
     {
         var configured = SandboxExe.Text.Trim();
-        var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
-        if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
+        if (!ProcessSessionService.IsSandboxieReady(configured, out var readiness))
         {
-            SandboxStatus.Text = Strings.SandboxStatusNone;
+            SandboxStatus.Text = string.IsNullOrWhiteSpace(readiness)
+                ? Strings.SandboxStatusNone
+                : $"Sandboxie: not ready — {readiness}";
             return;
         }
+        var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart()! : configured;
         var version = ProcessSessionService.GetSandboxieVersion(resolved);
         SandboxStatus.Text = L10n.Fmt(Strings.SandboxStatusOk, resolved, ProcessSessionService.GetBoxesRoot())
             + (string.IsNullOrWhiteSpace(version) ? string.Empty : $" v{version}");
