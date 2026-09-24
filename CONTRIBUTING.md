@@ -1,13 +1,16 @@
-# Contributing
+# Contributing — Camfrog Multi-ID Manager
 
-Thanks for contributing to projects created from this template.
+Thanks for contributing. This is a Windows WPF `.NET 8` project; you need
+the .NET 8 SDK on Windows x64.
 
 ## Development workflow
 
 1. Fork or create a feature branch from `main`.
 2. Keep changes focused and reviewable.
 3. Add or update tests for behavior changes.
-4. Run the repository's formatting, linting, test, build, and security checks.
+4. Run, in order (see `docs/development.md`):
+   `dotnet restore` (solution + win-x64 graph), Debug + Release builds
+   (0 warnings), `dotnet test`, `build-release.ps1`.
 5. Update documentation and `CHANGELOG.md` when relevant.
 6. Open a pull request and complete the checklist.
 

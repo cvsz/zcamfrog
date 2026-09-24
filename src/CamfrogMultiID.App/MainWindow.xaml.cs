@@ -32,6 +32,7 @@ public partial class MainWindow : Window
         // SelectionChanged/TextChanged fire during InitializeComponent (XAML default
         // selection); ignore them until construction is complete. See startup-error.log
         // NullReferenceException at UpdateLogBox via LogLevelBox_SelectionChanged.
+        Title = $"{Strings.MainTitle} v{App.AppVersion}";
         _initialized = true;
     }
 
