@@ -398,6 +398,26 @@ public sealed class DatabaseService
         }
     }
 
+    public sealed record EventEntry(long Id, string Utc, string Level, string Message);
+
+    public IReadOnlyList<EventEntry> GetRecentEvents(int limit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+        var capped = Math.Min(limit, 500);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT id,utc,level,message FROM events ORDER BY id DESC LIMIT $n;";
+            command.Parameters.AddWithValue("$n", capped);
+            using var reader = command.ExecuteReader();
+            var result = new List<EventEntry>();
+            while (reader.Read())
+                result.Add(new EventEntry(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            return result;
+        }
+    }
+
     public void Log(string level, string message)
     {
         lock (_gate)
@@ -1059,6 +1079,50 @@ public sealed class ProcessSessionService
 
     public static string BuildCreateBoxArguments(string boxName) =>
         $"/Box:{boxName} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+
+    /// <summary>
+    /// Builds an elevated launcher that creates every box (box creation
+    /// writes the Sandboxie configuration, which needs admin). The caller
+    /// starts it with the "runas" verb, which raises the UAC prompt.
+    /// Pure function for testability; performs no elevation itself.
+    /// </summary>
+    public static (string FileName, string Arguments) BuildElevatedCreateBoxesCommand(
+        string startExe, IReadOnlyList<string> boxNames)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        ArgumentNullException.ThrowIfNull(boxNames);
+        if (boxNames.Count == 0)
+            throw new ArgumentException("At least one box name is required.", nameof(boxNames));
+        var distinct = boxNames
+            .Where(b => !string.IsNullOrWhiteSpace(b))
+            .Select(b => b.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (distinct.Count == 0)
+            throw new ArgumentException("At least one box name is required.", nameof(boxNames));
+
+        var script = string.Join("; ", distinct.Select(box =>
+            $"& '{startExe.Replace("'", "''", StringComparison.Ordinal)}' /Box:{box} \"$env:SystemRoot\\System32\\cmd.exe\" /c exit")) +
+            "; exit $LASTEXITCODE";
+        // -EncodedCommand avoids all nested-quoting hazards.
+        var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+        return ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}");
+    }
+
+    public static int CreateBoxesElevated(string startExe, IReadOnlyList<string> boxNames)
+    {
+        var (fileName, arguments) = BuildElevatedCreateBoxesCommand(startExe, boxNames);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            UseShellExecute = true,
+            Verb = "runas",
+            WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System)
+        }) ?? throw new InvalidOperationException("Could not launch the elevated helper (UAC prompt declined or failed).");
+        process.WaitForExit();
+        return process.ExitCode;
+    }
 
     public static void CreateBox(string startExe, string boxName)
     {

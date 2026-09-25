@@ -15,6 +15,8 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 ### Added
 - Thai translation repair: 118 values damaged by an editing channel rewritten verified-clean (0 control chars, exact codepoints); regression test guards the class; Thai-capable font fallback on log/details panes
 - Auto-start: `AutoStartAccounts` setting starts enabled accounts silently at manager launch; `TryStartSandboxieService` best-effort SbieSvc start (elevation-gated) wired into startup when sandboxing is on
+- Health dashboard: per-account running/error lines with uptime plus a live 30-event feed; `GetRecentEvents` API
+- One-click elevated box creation: Settings "Create Boxes (Admin...)" relaunches the box setup with a UAC prompt (`-EncodedCommand`, no quoting hazards); empty/duplicate box lists handled
 - Account lifecycle: Edit (display/username/enabled + optional password replace), Delete with confirmation + secret/profile cleanup, Enable/Disable toggle, Change Password dialog, Clear Error
 - Main window: search/filter, selected-account details + launch preview, status bar (counts + client status), log level filter + tail 500 + auto-scroll + clear/open-folder, context menu, double-click edit, F5/Delete/Enter shortcuts, Start All / Stop All confirmations
 - Settings: exe existence status, template warning validation, data folder display + open-folder

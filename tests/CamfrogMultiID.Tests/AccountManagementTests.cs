@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using CamfrogMultiID.Core;
 using CamfrogMultiID.Infrastructure;
 
@@ -218,6 +219,26 @@ public sealed class AccountManagementTests : IDisposable
         Assert.Null(ProcessSessionService.GetSandboxieVersion(Path.Combine(_tempRoot, "missing.exe")));
         Assert.Null(ProcessSessionService.GetSandboxieVersion(""));
         Assert.Null(ProcessSessionService.GetSandboxieVersion(null));
+    }
+
+    private static readonly string[] SampleBoxes = ["BoxA", "BoxB", "boxa", "  "];
+    private static readonly string[] NoBoxes = [];
+
+    [Fact]
+    public void BuildElevatedCreateBoxesCommand_EncodesBoxes()
+    {
+        var (file, args) = ProcessSessionService.BuildElevatedCreateBoxesCommand(
+            @"C:\sb\Start.exe", SampleBoxes);
+        Assert.Equal("powershell.exe", file);
+        Assert.Contains("-EncodedCommand", args, StringComparison.Ordinal);
+        var encoded = args.Substring(args.IndexOf("-EncodedCommand", StringComparison.Ordinal) + "-EncodedCommand".Length).Trim();
+        var script = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+        Assert.Contains(@"C:\sb\Start.exe", script, StringComparison.Ordinal);
+        Assert.Contains("BoxA", script, StringComparison.Ordinal);
+        Assert.Contains("BoxB", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("runas", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand("", SampleBoxes));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand(@"C:\sb\Start.exe", NoBoxes));
     }
 
     [Fact]

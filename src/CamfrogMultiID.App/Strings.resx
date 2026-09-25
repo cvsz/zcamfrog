@@ -494,4 +494,19 @@
   <data name="BoxesElevationHint" xml:space="preserve">
     <value>Tip: creating boxes writes the Sandboxie configuration, which requires elevation. Run the manager as administrator, or create the boxes in SandMan (as admin).</value>
   </data>
+  <data name="DashboardTitle" xml:space="preserve">
+    <value>Health Dashboard</value>
+  </data>
+  <data name="DashboardRunning" xml:space="preserve">
+    <value>RUNNING {0} (PID {1}, up {2})</value>
+  </data>
+  <data name="DashboardErrorAcct" xml:space="preserve">
+    <value>ERROR {0}: {1}</value>
+  </data>
+  <data name="CreateBoxesAdmin" xml:space="preserve">
+    <value>Create Boxes (Admin...)</value>
+  </data>
+  <data name="MsgAdminLaunchFailed" xml:space="preserve">
+    <value>Unable to launch the elevated helper.{0}{0}{1}</value>
+  </data>
 </root>

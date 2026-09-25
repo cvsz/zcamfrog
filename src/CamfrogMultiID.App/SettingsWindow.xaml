@@ -14,6 +14,7 @@
         <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="0,0,0,4">
             <Button Content="{x:Static loc:Strings.DownloadSandboxie}" Click="DownloadSandboxie_Click" Width="170"/>
             <Button Content="{x:Static loc:Strings.CreateBoxes}" Click="CreateBoxes_Click" Width="210"/>
+            <Button Content="{x:Static loc:Strings.CreateBoxesAdmin}" Click="CreateBoxesAdmin_Click" Width="190"/>
         </StackPanel>
         <StackPanel Grid.Row="11" Orientation="Horizontal" Margin="0,4,0,4" VerticalAlignment="Center">
             <TextBlock Text="{x:Static loc:Strings.AutoBackupEvery}" VerticalAlignment="Center" Margin="0,0,6,0"/>

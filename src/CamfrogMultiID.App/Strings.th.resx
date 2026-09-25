@@ -494,4 +494,19 @@
   <data name="BoxesElevationHint" xml:space="preserve">
     <value>เคล็ดลับ: การสร้าง Box ต้องเขียนค่า Sandboxie ซึ่งต้องใช้สิทธิ์ผู้ดูแล รันตัวจัดการแบบผู้ดูแล หรือสร้าง Box ใน SandMan (แบบผู้ดูแล)</value>
   </data>
+  <data name="DashboardTitle" xml:space="preserve">
+    <value>แดชบอร์ดสุขภาพ</value>
+  </data>
+  <data name="DashboardRunning" xml:space="preserve">
+    <value>รัน {0} (PID {1}, ต่อเนื่อง {2})</value>
+  </data>
+  <data name="DashboardErrorAcct" xml:space="preserve">
+    <value>ผิดพลาด {0}: {1}</value>
+  </data>
+  <data name="CreateBoxesAdmin" xml:space="preserve">
+    <value>สร้าง Box (แอดมิน...)</value>
+  </data>
+  <data name="MsgAdminLaunchFailed" xml:space="preserve">
+    <value>เปิดตัวช่วยแบบยกระดับไม่ได้{0}{0}{1}</value>
+  </data>
 </root>

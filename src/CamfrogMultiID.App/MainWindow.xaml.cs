@@ -29,6 +29,8 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(AccountsGrid, "Accounts");
         System.Windows.Automation.AutomationProperties.SetName(LogBox, "Application log");
         System.Windows.Automation.AutomationProperties.SetName(DetailsBox, "Selected account details");
+        System.Windows.Automation.AutomationProperties.SetName(DashboardStats, "Health summary");
+        System.Windows.Automation.AutomationProperties.SetName(EventsList, "Recent events");
         // SelectionChanged/TextChanged fire during InitializeComponent (XAML default
         // selection); ignore them until construction is complete. See startup-error.log
         // NullReferenceException at UpdateLogBox via LogLevelBox_SelectionChanged.
@@ -207,6 +209,7 @@ public partial class MainWindow : Window
 
             UpdateDetails(view);
             UpdateStatusBar(all);
+            UpdateDashboard(all);
             UpdateLogBox();
         }
         catch (Exception ex)
@@ -281,6 +284,30 @@ public partial class MainWindow : Window
             : File.Exists(settings.ClientExecutable)
                 ? L10n.Fmt(Strings.ClientOk, settings.ClientExecutable)
                 : L10n.Fmt(Strings.ClientMissing, settings.ClientExecutable);
+    }
+
+    private void UpdateDashboard(List<CamfrogAccount> all)
+    {
+        try
+        {
+            var lines = new List<string>();
+            foreach (var account in all)
+            {
+                if (account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase) && account.StartedAtUtc is DateTime started)
+                    lines.Add(L10n.Fmt(Strings.DashboardRunning, account.DisplayName, account.ProcessId, FormatDuration(DateTime.UtcNow - started.ToUniversalTime())));
+                else if (account.Status.Equals("Error", StringComparison.OrdinalIgnoreCase))
+                    lines.Add(L10n.Fmt(Strings.DashboardErrorAcct, account.DisplayName, account.LastError));
+            }
+            if (lines.Count == 0)
+                lines.Add(StatusCounts.Text);
+            DashboardStats.Text = string.Join(Environment.NewLine, lines);
+
+            var events = App.Db.GetRecentEvents(30);
+            EventsList.ItemsSource = events.Select(e => $"{e.Utc} [{e.Level}] {e.Message}").ToList();
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (InvalidOperationException) { }
     }
 
     private void UpdateLogBox()

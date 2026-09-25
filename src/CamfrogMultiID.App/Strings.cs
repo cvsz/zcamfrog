@@ -167,6 +167,11 @@ public static class Strings
     public static string AutoStartAccounts => Manager.GetString("AutoStartAccounts", CultureInfo.CurrentUICulture) ?? "AutoStartAccounts";
     public static string BoxesNone => Manager.GetString("BoxesNone", CultureInfo.CurrentUICulture) ?? "BoxesNone";
     public static string BoxesElevationHint => Manager.GetString("BoxesElevationHint", CultureInfo.CurrentUICulture) ?? "BoxesElevationHint";
+    public static string DashboardTitle => Manager.GetString("DashboardTitle", CultureInfo.CurrentUICulture) ?? "DashboardTitle";
+    public static string DashboardRunning => Manager.GetString("DashboardRunning", CultureInfo.CurrentUICulture) ?? "DashboardRunning";
+    public static string DashboardErrorAcct => Manager.GetString("DashboardErrorAcct", CultureInfo.CurrentUICulture) ?? "DashboardErrorAcct";
+    public static string CreateBoxesAdmin => Manager.GetString("CreateBoxesAdmin", CultureInfo.CurrentUICulture) ?? "CreateBoxesAdmin";
+    public static string MsgAdminLaunchFailed => Manager.GetString("MsgAdminLaunchFailed", CultureInfo.CurrentUICulture) ?? "MsgAdminLaunchFailed";
 }
 
 /// <summary>Formats resource templates. A helper (rather than inline string.Format) because resource
