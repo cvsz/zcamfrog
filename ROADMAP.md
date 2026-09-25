@@ -4,7 +4,7 @@ Priorities: P0 security/correctness, P1 release blockers, P2
 reliability, P3 UX, P4 future. Evidence = commit + tests + CI run on
 `main` at time of writing (`d4b979f`; verify current HEAD).
 
-## P0 — done (evidence: 94/94 tests, 0 warnings, CI + CodeQL green)
+## P0 — done (evidence: 100/100 tests, 0 warnings, CI + CodeQL green)
 
 - [x] Fail-closed process identity (PID/start-time/executable, stale-PID refusal)
 - [x] DPAPI `CurrentUser` secrets; no plaintext in logs/CLI/DB
