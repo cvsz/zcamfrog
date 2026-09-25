@@ -7,8 +7,8 @@ namespace CamfrogMultiID.Infrastructure;
 /// <summary>
 /// Exports and restores manager data (SQLite database, DPAPI secrets,
 /// settings). Profile directories are intentionally excluded: they are
-/// large and client-regenerable. All zip entry names are validated to
-/// block path traversal on restore.
+/// large and client-regenerable. Restore accepts only the documented entry
+/// names and resolves secret entries to a single safe file-name component.
 /// </summary>
 public static class BackupService
 {
@@ -22,8 +22,6 @@ public static class BackupService
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationZip);
 
         var tempZip = destinationZip + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        // Snapshot the live database with VACUUM INTO: pooled SQLite connections
-        // keep camfrog.db locked, so zipping it directly fails while running.
         var dbSnapshot = Path.Combine(
             Path.GetTempPath(),
             "camfrog-backup-" + Guid.NewGuid().ToString("N") + ".db");
@@ -57,7 +55,6 @@ public static class BackupService
         using var connection = new SqliteConnection($"Data Source={databasePath};Cache=Shared");
         connection.Open();
         using var command = connection.CreateCommand();
-        // Parameterize the path via quote escaping: single quotes doubled.
         var escaped = snapshotPath.Replace("'", "''", StringComparison.Ordinal);
         command.CommandText = $"VACUUM INTO '{escaped}';";
         command.ExecuteNonQuery();
@@ -125,7 +122,6 @@ public static class BackupService
         ArgumentNullException.ThrowIfNull(paths);
         ValidateBackup(backupZip);
 
-        // Release pooled handles on the live database so overwrite succeeds.
         SqliteConnection.ClearAllPools();
         using var archive = ZipFile.OpenRead(backupZip);
         foreach (var entry in archive.Entries)
@@ -148,7 +144,7 @@ public static class BackupService
         if (string.IsNullOrWhiteSpace(entry))
             throw new InvalidDataException("Backup contains an empty entry name.");
         var normalized = entry.Replace('\\', '/');
-        if (normalized.StartsWith('/'))
+        if (Path.IsPathFullyQualified(normalized) || normalized.StartsWith('/'))
             throw new InvalidDataException($"Unsafe backup entry: '{entry}'.");
         foreach (var segment in normalized.Split('/'))
         {
@@ -177,8 +173,17 @@ public static class BackupService
             return paths.Database;
         if (string.Equals(normalized, SettingsEntry, StringComparison.Ordinal))
             return paths.Settings;
-        if (normalized.StartsWith(SecretsPrefix, StringComparison.Ordinal))
-            return Path.Combine(paths.Secrets, normalized.Substring(SecretsPrefix.Length));
-        return null;
+        if (!normalized.StartsWith(SecretsPrefix, StringComparison.Ordinal))
+            return null;
+
+        // Path.GetFileName is an explicit Zip Slip sanitizer: only a single
+        // leaf file name may reach Path.Combine/ExtractToFile.
+        var secretFile = Path.GetFileName(normalized);
+        if (string.IsNullOrWhiteSpace(secretFile) ||
+            !string.Equals(normalized, SecretsPrefix + secretFile, StringComparison.Ordinal) ||
+            !secretFile.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Unsafe backup entry: '{entry}'.");
+
+        return Path.Combine(paths.Secrets, secretFile);
     }
 }
