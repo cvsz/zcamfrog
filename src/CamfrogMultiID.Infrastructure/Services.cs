@@ -718,6 +718,11 @@ public sealed class ProcessSessionService
             {
                 try { process.CloseMainWindow(); } catch (InvalidOperationException) { }
 
+                // Killing Start.exe does not stop a sandbox: Sandboxie keeps
+                // box contents alive. Terminate the whole box instead.
+                if (IsSandboxedExecutable(account.ProcessExecutablePath))
+                    TerminateBox(account.ProcessExecutablePath, SanitizeBoxName(account));
+
                 if (!process.HasExited && !process.WaitForExit(5000))
                     process.Kill(entireProcessTree: true);
 
@@ -1095,6 +1100,42 @@ public sealed class ProcessSessionService
         ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
         return $"set {boxName.Trim()} Enabled y";
     }
+
+    public static string BuildTerminateArguments(string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        return $"/Box:{boxName.Trim()} /terminate";
+    }
+
+    /// <summary>
+    /// Best-effort termination of everything inside a Sandboxie box.
+    /// Never throws: callers fall back to process-tree kill.
+    /// </summary>
+    public static void TerminateBox(string startExe, string boxName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+                return;
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = startExe,
+                Arguments = BuildTerminateArguments(boxName),
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit(15000);
+        }
+        catch (InvalidOperationException) { }
+        catch (System.ComponentModel.Win32Exception) { }
+        catch (FileNotFoundException) { }
+    }
+
+    public static bool IsSandboxedExecutable(string? executablePath) =>
+        string.Equals(
+            Path.GetFileName(executablePath ?? string.Empty),
+            "Start.exe",
+            StringComparison.OrdinalIgnoreCase);
 
 
 

@@ -80,6 +80,13 @@ the boxes exist.
   and this project's release, verifies checksums; silent install
   requires elevation.
 
+## Stopping
+Killing `Start.exe` does **not** stop a sandbox — Sandboxie keeps box
+contents (client, helpers) alive. Stop therefore runs
+`Start.exe /Box:<name> /terminate` first (best-effort), then falls back
+to process-tree kill on the tracked process. Verified live: a
+`/wait`-held box empties and its waiter exits after `/terminate`.
+
 ## Limits
 - Sandboxie must be installed separately (driver = admin).
 - Multi-instance behavior ultimately depends on the client tolerating

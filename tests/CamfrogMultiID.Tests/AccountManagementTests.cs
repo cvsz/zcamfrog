@@ -242,6 +242,24 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void BuildTerminateArguments_FormatsTerminate()
+    {
+        Assert.Equal("/Box:MyBox /terminate", ProcessSessionService.BuildTerminateArguments("MyBox"));
+        Assert.Equal("/Box:X /terminate", ProcessSessionService.BuildTerminateArguments("  X  "));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildTerminateArguments("   "));
+    }
+
+    [Fact]
+    public void IsSandboxedExecutable_DetectsStartExe()
+    {
+        Assert.True(ProcessSessionService.IsSandboxedExecutable(@"C:\Program Files\Sandboxie-Plus\Start.exe"));
+        Assert.True(ProcessSessionService.IsSandboxedExecutable("start.EXE"));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(@"C:\Camfrog\Camfrog.exe"));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(""));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(null));
+    }
+
+    [Fact]
     public void BuildSbieIniSetArguments_FormatsSetCommand()
     {
         Assert.Equal("set MyBox Enabled y", ProcessSessionService.BuildSbieIniSetArguments("MyBox"));

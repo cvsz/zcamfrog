@@ -12,6 +12,9 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - `ABOUT.md`, `GOVERNANCE.md`, `CONTRIBUTING.md`, `.env.example`, `CODEOWNERS` rewritten from template-generic to project-specific; unused `FUNDING.yml` removed
 
 ## [Unreleased]
+### Fixed
+- Stop left sandboxed clients running: killing `Start.exe` does not stop a Sandboxie box. Stop now runs `Start.exe /Box:<name> /terminate` first (verified live), then falls back to process-tree kill
+
 ### Added
 - Thai translation repair: 118 values damaged by an editing channel rewritten verified-clean (0 control chars, exact codepoints); regression test guards the class; Thai-capable font fallback on log/details panes
 - Auto-start: `AutoStartAccounts` setting starts enabled accounts silently at manager launch; `TryStartSandboxieService` best-effort SbieSvc start (elevation-gated) wired into startup when sandboxing is on
