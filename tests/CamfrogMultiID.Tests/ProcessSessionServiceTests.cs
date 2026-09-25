@@ -196,6 +196,30 @@ public sealed class ProcessSessionServiceTests : IDisposable
     }
 
     [Fact]
+    public void Stop_RefusesLiveForeignProcess()
+    {
+        using var current = Process.GetCurrentProcess();
+        var id = _db.Add(new CamfrogAccount
+        {
+            DisplayName = "foreign",
+            Username = "foreign_" + Guid.NewGuid().ToString("N"),
+            PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+            ProfileDirectory = Path.Combine(_tempRoot, "p_foreign"),
+            Enabled = true
+        });
+        // Add() persists identity columns only; runtime state needs UpdateRuntime.
+        _db.UpdateRuntime(id, "Running", current.Id, current.StartTime.ToUniversalTime(), "", @"C:\definitely\not\this\client.exe");
+        var acc = _db.GetById(id)!;
+        Assert.Equal(current.Id, acc.ProcessId);
+        // Must not kill the running test process.
+        _svc.Stop(acc);
+        Assert.False(current.HasExited);
+        var updated = _db.GetById(id)!;
+        Assert.Equal("Stopped", updated.Status);
+        Assert.Contains("no longer matches", updated.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Stop_NoPid_UpdatesToStopped()
     {
         var id = _db.Add(new CamfrogAccount

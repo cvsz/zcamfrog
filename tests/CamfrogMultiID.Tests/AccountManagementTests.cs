@@ -174,6 +174,24 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void SetRoomUrl_EnforcesCanonicalScheme()
+    {
+        var id = _db.Add(NewAccount("roomcanon"));
+        Assert.Throws<InvalidOperationException>(() => _db.SetRoomUrl(id, "https://example.com/r"));
+        Assert.Throws<InvalidOperationException>(() => _db.SetRoomUrl(id, "javascript:alert(1)"));
+        _db.SetRoomUrl(id, "");
+        Assert.Equal(string.Empty, _db.GetById(id)!.RoomUrl);
+        _db.SetRoomUrl(id, "  camfrog://join_room/?name=X  ");
+        Assert.Equal("camfrog://join_room/?name=X", _db.GetById(id)!.RoomUrl);
+    }
+
+    [Fact]
+    public void SecretsAcl_RestrictedOnWindows()
+    {
+        Assert.True(_paths.SecretsAclRestricted);
+    }
+
+    [Fact]
     public void SetRoomUrl_Persists()
     {
         var id = _db.Add(NewAccount("roomuser"));

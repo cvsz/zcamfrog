@@ -22,6 +22,8 @@ public sealed class AppPaths
     {
     }
 
+    public bool SecretsAclRestricted { get; }
+
     public AppPaths(string root)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
@@ -30,18 +32,19 @@ public sealed class AppPaths
         Directory.CreateDirectory(Profiles);
         Directory.CreateDirectory(Secrets);
         Directory.CreateDirectory(Logs);
-        RestrictSecretsAccess();
+        SecretsAclRestricted = RestrictSecretsAccess();
     }
 
-    private void RestrictSecretsAccess()
+    private bool RestrictSecretsAccess()
     {
         // Best-effort: DPAPI blobs should be reachable only by the current user.
-        // Never let an ACL failure break startup.
+        // Never let an ACL failure break startup. The result is reported
+        // (DPAPI remains the cryptographic boundary either way).
         try
         {
             var identity = System.Security.Principal.WindowsIdentity.GetCurrent()?.Name;
             if (string.IsNullOrWhiteSpace(identity))
-                return;
+                return false;
             var security = new DirectoryInfo(Secrets).GetAccessControl();
             security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
             security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
@@ -51,20 +54,34 @@ public sealed class AppPaths
                 System.Security.AccessControl.PropagationFlags.None,
                 System.Security.AccessControl.AccessControlType.Allow));
             new DirectoryInfo(Secrets).SetAccessControl(security);
+            return true;
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-        catch (PlatformNotSupportedException) { }
-        catch (InvalidOperationException) { }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (PlatformNotSupportedException) { return false; }
+        catch (InvalidOperationException) { return false; }
     }
 }
 
 public sealed class DatabaseService
 {
+    public const int SchemaVersion = 4;
+
     private readonly AppPaths _paths;
     private readonly object _gate = new();
 
     public DatabaseService(AppPaths paths) => _paths = paths;
+
+    public int GetSchemaVersion()
+    {
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version;";
+            return Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
 
     private SqliteConnection Open()
     {
@@ -109,11 +126,14 @@ public sealed class DatabaseService
                 """;
             command.ExecuteNonQuery();
 
-            // Forward-compatible migration for databases created by older builds.
+            // Ordered, idempotent migrations. Bump SchemaVersion when adding one.
             EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(connection, "accounts", "password_changed_utc", "TEXT NOT NULL DEFAULT ''");
+            using var version = connection.CreateCommand();
+            version.CommandText = $"PRAGMA user_version = {SchemaVersion};";
+            version.ExecuteNonQuery();
         }
     }
 
@@ -242,8 +262,8 @@ public sealed class DatabaseService
     public void UpdateDetails(long id, string displayName, string username, bool enabled)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        var cleanDisplay = ValidateAccountField(displayName, nameof(displayName));
+        var cleanUser = ValidateAccountField(username, nameof(username));
         lock (_gate)
         {
             using var connection = Open();
@@ -253,8 +273,8 @@ public sealed class DatabaseService
                 SET display_name=$d, username=$u, enabled=$e
                 WHERE id=$id;
                 """;
-            command.Parameters.AddWithValue("$d", displayName.Trim());
-            command.Parameters.AddWithValue("$u", username.Trim());
+            command.Parameters.AddWithValue("$d", cleanDisplay);
+            command.Parameters.AddWithValue("$u", cleanUser);
             command.Parameters.AddWithValue("$e", enabled ? 1 : 0);
             command.Parameters.AddWithValue("$id", id);
             var rows = command.ExecuteNonQuery();
@@ -263,15 +283,29 @@ public sealed class DatabaseService
         }
     }
 
+    public static string ValidateAccountField(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+        var clean = value.Trim();
+        if (clean.Length > 80)
+            throw new ArgumentException("Value is too long (max 80 characters).", paramName);
+        if (clean.Any(char.IsControl))
+            throw new ArgumentException("Value must not contain control characters.", paramName);
+        return clean;
+    }
+
     public void SetRoomUrl(long id, string roomUrl)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+        var clean = string.IsNullOrWhiteSpace(roomUrl)
+            ? string.Empty
+            : ProcessSessionService.NormalizeRoomUrl(roomUrl);
         lock (_gate)
         {
             using var connection = Open();
             using var command = connection.CreateCommand();
             command.CommandText = "UPDATE accounts SET room_url=$r WHERE id=$id;";
-            command.Parameters.AddWithValue("$r", roomUrl ?? string.Empty);
+            command.Parameters.AddWithValue("$r", clean);
             command.Parameters.AddWithValue("$id", id);
             var rows = command.ExecuteNonQuery();
             if (rows == 0)
@@ -355,6 +389,11 @@ public sealed class DatabaseService
 
     public long Add(CamfrogAccount account)
     {
+        ArgumentNullException.ThrowIfNull(account);
+        account.DisplayName = ValidateAccountField(account.DisplayName, nameof(account.DisplayName));
+        account.Username = ValidateAccountField(account.Username, nameof(account.Username));
+        ArgumentException.ThrowIfNullOrWhiteSpace(account.PasswordSecretName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(account.ProfileDirectory);
         lock (_gate)
         {
             using var connection = Open();

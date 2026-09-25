@@ -25,6 +25,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 ## [Unreleased]
 ### Added
 - Online/offline + room dashboard: Presence/Room grid columns, honest join evidence (live client command lines scanned for the room link; server-side membership correctly reported as unobservable), room name parsing
+- Reviewed co-agent work (domain validation, schema versioning, ACL reporting, adversarial tests); fixed its `Stop_RefusesLiveForeignProcess` test, which set runtime state on the transient object instead of via `UpdateRuntime` and therefore proved nothing
 
 ### Fixed
 - Stop left sandboxed clients running: killing `Start.exe` does not stop a Sandboxie box. Stop now runs `Start.exe /Box:<name> /terminate` first (verified live), then falls back to process-tree kill

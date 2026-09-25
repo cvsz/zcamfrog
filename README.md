@@ -1,75 +1,40 @@
-# Camfrog Multi-ID Manager — Production Build Baseline
+# Camfrog Multi-ID Manager
 
-Windows WPF application targeting **.NET 8 / Windows / x64** for managing multiple local Camfrog client processes with separate profile directories and Windows DPAPI-protected stored passwords.
+Windows WPF desktop application (`.NET 8`, `net8.0-windows`, `win-x64`
+self-contained) for managing multiple local Camfrog client identities:
+isolated profiles, DPAPI-protected passwords, fail-closed process
+lifecycle, optional Sandboxie-Plus multi-instance support, and
+`camfrog:` room auto-join. English + Thai UI.
 
-## Authentication and security boundary
+## Security boundary
 
-This application launches the installed Camfrog client. It does **not** bypass authentication, CAPTCHA, rate limits, licensing, or other access controls, and it does not inject credentials into the client.
-
-The optional argument template supports only:
-
-- `{username}`
-- `{profile}`
-
-Use only command-line switches documented and supported by your installed Camfrog client. The stored password is protected with Windows DPAPI (`CurrentUser`) and is not automatically injected into the client.
-
-## Production fixes in this build
-
-### Build / solution
-- Fixed the broken `.sln` structure: `ProjectConfigurationPlatforms` now has its required `EndGlobalSection`.
-- Targets .NET 8 explicitly.
-- Normal solution builds do not force a RuntimeIdentifier; `win-x64` is applied only during production publish. This avoids RID-specific NuGet asset mismatches during ordinary development builds.
-- SQLite dependencies are pinned to the stable 8.0.30 Microsoft.Data.Sqlite line and its native SQLite bundle.
-- WPF application is configured for `win-x64`.
-- Release build uses warnings-as-errors and nullable reference types.
-- Added deterministic restore/build/publish PowerShell workflow.
-
-### Runtime/process lifecycle
-- Detects stale/reused PIDs before treating a process as the managed account.
-- Tracks process start time and executable path.
-- Refuses to terminate a process when the tracked identity does not match.
-- Graceful close first, then bounded wait, then process-tree termination.
-- Does not falsely mark a process stopped when termination fails.
-- Periodically reconciles process state with SQLite.
-- Start operations avoid duplicate instances for a tracked account.
-
-### Storage/security
-- SQLite username uniqueness is enforced case-insensitively.
-- SQLite busy timeout and foreign-key enforcement are enabled.
-- Existing databases are migrated forward with the new process metadata column.
-- Passwords are stored outside SQLite using Windows DPAPI CurrentUser protection.
-- Secret writes are temporary-file based and cleaned up on failure.
-- Account creation rolls back the profile and secret if database insertion fails.
-- Settings are written through a temporary file and cleaned up after replacement.
-- Runtime/event logs are persisted to SQLite and a text log.
-- Text log rotates at approximately 5 MiB.
-
-### Application reliability
-- Single-instance mutex handling is safe for abandoned and non-owner cases.
-- Startup failures are logged and surfaced.
-- UI refresh avoids re-entrant refresh operations.
-- File access failures in the log viewer do not crash the UI.
+This application launches the Camfrog client you installed. It does
+**not** bypass authentication, CAPTCHA, rate limits, or licensing; it
+does not inject credentials, generate subscriptions, or change nickname
+colors. Stored passwords use Windows DPAPI (`CurrentUser`) and are
+never logged, placed on command lines, or stored in the database.
 
 ## Requirements
 
-Build on Windows using either:
-
-- .NET 8 SDK, or
-- a newer .NET SDK capable of targeting `net8.0-windows`.
-
-For WPF builds, use a Windows machine with the Windows desktop targeting components available.
+- Windows 10/11 x64, `.NET 8 SDK` (`8.0.425+` known good).
+- No admin rights for daily use (admin needed only to install
+  Sandboxie-Plus or create Sandboxie boxes).
 
 ## Build
-
-From the repository root:
 
 ```powershell
 dotnet --info
 dotnet restore .\CamfrogMultiID.sln
+dotnet restore .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj --force-evaluate -r win-x64
+dotnet build .\CamfrogMultiID.sln -c Debug --no-restore
 dotnet build .\CamfrogMultiID.sln -c Release --no-restore
+dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-Run:
+Test results are reported by the runner and CI; this file intentionally
+states no hardcoded test count (see `.github/workflows/ci.yml`).
+
+Run (development):
 
 ```powershell
 dotnet run --project .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release
@@ -77,256 +42,80 @@ dotnet run --project .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Relea
 
 ## Production publish
 
-Use:
-
 ```powershell
 .\build-release.ps1
 ```
-
-The script performs restore, Release build, and self-contained x64 publish.
 
 Output:
 
 ```text
-src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\
+src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe
 ```
 
-The publish is configured as a self-contained Windows x64 application with a single-file executable.
+Self-contained single-file `win-x64`. If PowerShell blocks the unsigned
+script, use `build-release.cmd` (single-process `-ExecutionPolicy
+Bypass`, no machine change).
+
+Tagged releases (`v*.*.*`) additionally produce a versioned zip +
+`.sha256` and build provenance via `.github/workflows/release.yml`.
 
 ## Runtime data
 
-Data is stored under:
+Under `%LOCALAPPDATA%\CamfrogMultiID\`:
 
-```text
-%LOCALAPPDATA%\CamfrogMultiID\
-```
-
-Files:
-
-- `camfrog.db` — account/runtime/event metadata
-- `settings.json` — client executable and argument template
+- `camfrog.db` — accounts, runtime state, event log (SQLite, WAL-friendly,
+  case-insensitive username uniqueness)
+- `settings.json` — client exe, argument template, Sandboxie, backup,
+  language options
 - `profiles\` — per-account profile directories
-- `secrets\` — DPAPI-protected password blobs
-- `logs\app.log` — operational log
-- `logs\app.log.1` — previous rotated log
+- `secrets\` — DPAPI blobs, directory ACL restricted to current user
+- `logs\app.log` — operational log (rotates ~5 MiB), `startup-error.log`
+- `backups\` — scheduled/manual backup zips (DB snapshot + secrets +
+  settings; profiles excluded)
 
-## First-run procedure
+## First run
 
 1. Start `CamfrogMultiID.exe`.
-2. Open **Settings**.
-3. Select the installed Camfrog executable.
-4. Configure only documented client arguments if required.
-5. Add an account.
-6. Use **Start Selected** to launch one account.
-7. Confirm the client behaves correctly.
-8. Use **Start All** only after individual process behavior is verified.
+2. Settings → select the installed Camfrog executable.
+3. Add an account (username, password, optional `camfrog://join_room`
+   link, auto-restart opt-in).
+4. Start Selected → confirm the client behaves.
+5. For simultaneous instances: install Sandboxie-Plus, enable it in
+   Settings, Create Boxes, Start All. See `docs/sandboxie.md`.
 
-The manager does not assume that the installed Camfrog version accepts login/profile command-line switches.
+## Features
 
-## Important operational notes
+- Account lifecycle: add/edit/delete, enable/disable, change password,
+  clear error, duplicate detection (case-insensitive).
+- Process safety: PID/start-time/executable validation, stale-PID
+  refusal, graceful close → bounded wait → tree kill, Sandboxie box
+  `/terminate` on stop.
+- Auto-restart (opt-in, 3 per 10 min, then pauses with Error).
+- Search/filter, per-account details + launch preview, health dashboard
+  (presence, room, uptime, restarts, 30-event feed), status bar.
+- Log viewer (level filter, export, diagnostics bundle without secrets).
+- Backup/restore (traversal-safe) + scheduled auto-backups with pruning.
+- Password-age tracking with 90-day rotation notice.
 
-- Separate profile directories are created for each managed account, but whether the Camfrog client actually honors the directory depends on the supported client behavior.
-- If the client ignores `{profile}`, multiple instances may still share client state.
-- A stored password is not automatically submitted to Camfrog.
-- Do not place plaintext passwords in `settings.json`, command-line arguments, logs, or scripts.
-- The application intentionally runs without administrator elevation (`asInvoker`).
+## Limitations (honest)
+
+- The client is single-instance per Windows session; concurrent
+  instances need Sandboxie-Plus boxes (experimental, needs its
+  driver/service installed as admin).
+- Room auto-join passes the client's own `--url=` switch; server-side
+  room membership is not observable — the UI reports "auto-join sent",
+  never "joined".
+- A stored password is never auto-submitted to the client.
+- If the client ignores `{profile}`, instances may share client state.
 
 ## Troubleshooting
 
-### Solution parser error
+See `docs/troubleshooting.md` (captured failure modes: restore gaps,
+solution GUID corruption, startup handler ordering, publish file locks,
+script `param()` placement). Diagnostics: main window → Diagnostics —
+exports versions, counts, log, settings (no secrets/usernames).
 
-If you previously saw:
+## History
 
-```text
-Solution file error MSB5007:
-Error parsing the project configuration section in solution file.
-The entry "EndGlobal" is invalid.
-```
-
-the original solution was missing the `EndGlobalSection` terminator for `ProjectConfigurationPlatforms`. This package contains the corrected structure.
-
-### Verify the solution
-
-```powershell
-dotnet sln .\CamfrogMultiID.sln list
-```
-
-Expected projects:
-
-```text
-CamfrogMultiID.Core
-CamfrogMultiID.Infrastructure
-CamfrogMultiID.App
-CamfrogMultiID.Tests
-```
-
-### Clean rebuild
-
-```powershell
-dotnet clean .\CamfrogMultiID.sln -c Release
-Remove-Item -Recurse -Force .\src\CamfrogMultiID.App\bin, .\src\CamfrogMultiID.App\obj -ErrorAction SilentlyContinue
-dotnet restore .\CamfrogMultiID.sln
-dotnet build .\CamfrogMultiID.sln -c Release --no-restore
-```
-
-## Final production check
-
-Before distributing the application, verify on a clean Windows test machine:
-
-- Release build completes with zero warnings/errors.
-- Self-contained x64 publish starts.
-- Settings persist after restart.
-- One account starts and stops correctly.
-- Two accounts do not overwrite each other's profile directories.
-- Duplicate usernames are rejected case-insensitively.
-- A terminated client is detected by the manager.
-- A reused PID is not accidentally terminated.
-- DPAPI secrets are inaccessible to a different Windows user.
-- Application logs contain no plaintext password.
-
-
-## V5 restore/build workflow
-
-If `dotnet restore .\CamfrogMultiID.sln` reports success but the following build says:
-
-```text
-NETSDK1004: Assets file '...\CamfrogMultiID.App\obj\project.assets.json' not found
-```
-
-restore the application project directly:
-
-```powershell
-dotnet restore .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj --force-evaluate
-```
-
-Then verify:
-
-```powershell
-Test-Path .\src\CamfrogMultiID.App\obj\project.assets.json
-```
-
-It must return:
-
-```text
-True
-```
-
-Then:
-
-```powershell
-dotnet build .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release --no-restore
-```
-
-The V5 `build-release.ps1` performs this explicit graph restore automatically before building.
-
-For a completely clean V5 build:
-
-```powershell
-dotnet clean .\CamfrogMultiID.sln
-dotnet nuget locals all --clear
-
-Remove-Item -Recurse -Force .\src\CamfrogMultiID.App\bin, .\src\CamfrogMultiID.App\obj -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force .\src\CamfrogMultiID.Infrastructure\bin, .\src\CamfrogMultiID.Infrastructure\obj -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force .\src\CamfrogMultiID.Core\bin, .\src\CamfrogMultiID.Core\obj -ErrorAction SilentlyContinue
-
-dotnet restore .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj --force-evaluate
-dotnet build .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release --no-restore
-```
-
-
-## V6 analyzer fixes
-
-The Infrastructure project is built with analyzers enabled and warnings treated as errors. V6 fixes:
-
-- CA1305: database scalar conversion now uses `CultureInfo.InvariantCulture`.
-- CA1822: `IsTrackedProcessAlive` is declared `static` because it has no instance-state dependency.
-
-Build directly with:
-
-```powershell
-dotnet build .\src\CamfrogMultiID.App\CamfrogMultiID.App.csproj -c Release --no-restore
-```
-
-Do not add `NoWarn` or disable analyzers to work around compiler/analyzer failures; production builds should keep these checks enabled.
-
-
-## V7 App compilation fixes
-
-- Explicit `System.IO` imports were added to WPF code-behind files because the App project does not rely on implicit framework namespaces for `File`, `Path`, `Directory`, or `IOException`.
-- `IsTrackedProcessAlive` remains an instance method so existing `App.Sessions.IsTrackedProcessAlive(...)` calls are valid.
-- `StartAccount` and `StopAccount` are static because they use only application-wide services and their parameters, satisfying CA1822 without changing the public process-service API.
-
-
-## V13 test and solution regeneration
-
-- Regenerated `CamfrogMultiID.sln` via `dotnet new sln` to fix hidden solution-configuration corruption that caused `dotnet restore` to skip `Infrastructure`/`App` (`BuildProjectInSolution=False`) and required a manual `win-x64` workaround. The new sln correctly maps `Debug|Any CPU` and `Release|Any CPU` for all projects.
-- Added `tests/CamfrogMultiID.Tests` (xUnit, `net8.0-windows`, 39 tests) covering database, DPAPI, settings, process identity, quoting, and concurrency.
-- CI now runs on `windows-latest` with `setup-dotnet`, `restore` (solution + `win-x64`), `build` Debug/Release, `test`, `publish` single-file, and artifact upload.
-- CodeQL now scans `csharp` (windows) and `actions` (ubuntu) with `security-extended`.
-- `.gitignore` now excludes `bin/`, `obj/`, `.vs/`, `TestResults/`, `publish/`.
-- `Makefile` and `Dockerfile` updated to reflect actual Windows WPF lifecycle.
-- Docs `docs/architecture.md`, `docs/development.md`, `docs/release.md`, `docs/template-inventory.md` synchronized.
-
-## PowerShell execution policy
-
-The production script does not require changing the machine-wide execution policy. If PowerShell blocks `build-release.ps1` because it is unsigned, use the included `build-release.cmd` launcher:
-
-```cmd
-build-release.cmd
-```
-
-It invokes PowerShell with `-ExecutionPolicy Bypass` for that single build process only. It does not permanently change the user's or machine's execution policy.
-
-Alternatively, for the current PowerShell session only:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\build-release.ps1
-```
-
-## V14 production UI completion
-
-Camfrog client scope: rooms, contacts, IM, ponds, gifts, Pro multi-cam are in-client behaviors. This manager does not automate them; it provides deterministic multi-identity process isolation (profile directory, DPAPI secret, PID/start-time/exe validation, fail-closed reuse protection).
-
-Manager UI now completes the lifecycle:
-
-- Add / Edit (display, username case-insensitive unique, enabled, optional password replace) / Delete (confirmation, stops tracked process, removes DB row + DPAPI secret + profile) / Enable-Disable toggle / Change Password / Clear Error
-- Search by display, username, status; double-click edit; right-click context menu; F5 refresh, Delete delete, Enter start
-- Selected-account details: profile path + existence, secret + DPAPI state, exe path, PID, started UTC/local, full launch preview (`PreviewCommandLine`)
-- Status bar: total / running / error / disabled + client exe configured-missing state
-- Log: level filter (All/INFO/WARN/ERROR), tail 500 lines, auto-scroll toggle, clear view, open log folder
-- Settings: exe existence status, template placeholder validation (`{username}`, `{profile}` only, warn and confirm on unsupported), data folder display + open
-- Start All / Stop All with confirmations; Start skips already-alive tracked processes
-
-```powershell
-dotnet restore .\CamfrogMultiID.sln
-dotnet build .\CamfrogMultiID.sln -c Release --no-restore
-dotnet test .\CamfrogMultiID.sln -c Release --no-build
-```
-
-94 tests pass (see CHANGELOG for the full list). Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
-
-## V20 Thai localization
-
-Settings → Language → English/ไทย (full restart to apply). All 4 windows, grid headers, context menu, and every dialog/message are resourced (`Strings.resx` + `Strings.th.resx`, 152 keys); a reflection test asserts every key resolves non-empty in both cultures. Thai launch verified end-to-end (clean start, no startup errors).
-
-## V17 reliability + backup
-
-- **Auto-restart (opt-in):** tick per account in Add/Edit. If the tracked client exits, the 2s reconciler restarts it silently (no popups from the timer); more than 3 restarts in 10 minutes pauses with an `Error` status and `WARN` log instead of looping forever. Manual start/stop resets the budget.
-- **Backup/restore (Settings):** zips a `VACUUM INTO` snapshot of the live database (pooled connections lock the live file, so direct zipping fails) plus secrets and settings; profile dirs excluded. Restore validates every zip entry against path traversal, stops tracked clients, and replaces data.
-- **Secrets ACL:** `%LOCALAPPDATA%\CamfrogMultiID\secrets\` is restricted to the current Windows user on startup (in addition to DPAPI).
-- **Audit:** every lifecycle operation already logs to DB + file; added one-click log export next to the log filter.
-
-## V16 Sandboxie onboarding + bundle
-
-- Settings shows Sandboxie detection status and boxes root, downloads Sandboxie-Plus from GitHub releases, and creates one box per account (`Start.exe /Box:<name> cmd /c exit`).
-- Details panel shows box state (`[created]` / `[not created — use Settings]`) when sandboxing is enabled.
-- `bundle-setup.ps1` (launcher `bundle-setup.cmd`) downloads Sandboxie-Plus latest + the manager release zip, verifies SHA256, extracts, and prints the manual Camfrog client step. We do not ship our own sandbox driver: kernel-level virtualization is Sandboxie-Plus's job (free, GPL-3.0, used as an external tool).
-
-## V15 sandbox multi-instance + room auto-join (experimental)
-
-The Camfrog client enforces single-instance per Windows session (verified: a second process with redirected `%APPDATA%` still exits; `CreateMutexW` in the binary). Environment-variable sandboxing alone does not work.
-
-- **Sandboxie path (recommended):** install Sandboxie-Plus, enable it in Settings (auto-detects `Start.exe` or set the path). Each account launches as `Start.exe /wait /Box:<sanitized-username> <client> <args>`, giving each identity its own object namespace so instances run side by side. `/wait` keeps the tracked PID valid for the whole session; PID/start-time/exe identity checks apply to `Start.exe`.
-- **Auto-join:** set a per-account Room URL (Add/Edit dialog). Only the `camfrog:` scheme is accepted (copy the room link from the client's room directory). Start appends `--url="<link>"` — the switch the client's own protocol registration uses. The details panel previews the full launch command including the sandbox wrapper.
-- Without Sandboxie, starting a second account while one client runs will still hand off and exit; the manager marks it Stopped with the reason instead of tracking a dead PID.
+Past per-version changes live in `CHANGELOG.md`. This README describes
+the current tree only.

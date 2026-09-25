@@ -124,6 +124,35 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public void SchemaVersion_MatchesExpected()
+    {
+        Assert.Equal(DatabaseService.SchemaVersion, _db.GetSchemaVersion());
+    }
+
+    [Fact]
+    public void UpdateDetails_ValidatesDomain()
+    {
+        var id = _db.Add(NewAccount("vuser"));
+        Assert.Throws<ArgumentException>(() => _db.UpdateDetails(id, "", "x", true));
+        Assert.Throws<ArgumentException>(() => _db.UpdateDetails(id, "x", "   ", true));
+        Assert.Throws<ArgumentException>(() => _db.UpdateDetails(id, new string('a', 81), "x", true));
+        Assert.Throws<ArgumentException>(() => _db.UpdateDetails(id, "ok", "a\tb", true));
+        _db.UpdateDetails(id, "  spaced  ", "  spaceduser  ", true);
+        var updated = _db.GetById(id)!;
+        Assert.Equal("spaced", updated.DisplayName);
+        Assert.Equal("spaceduser", updated.Username);
+    }
+
+    [Fact]
+    public void Add_ValidatesDomain()
+    {
+        Assert.Throws<ArgumentNullException>(() => _db.Add(null!));
+        var bad = NewAccount("x");
+        bad.Username = "";
+        Assert.Throws<ArgumentException>(() => _db.Add(bad));
+    }
+
+    [Fact]
     public void GetRecentEvents_ReturnsNewestFirst()
     {
         _db.Log("INFO", "first");

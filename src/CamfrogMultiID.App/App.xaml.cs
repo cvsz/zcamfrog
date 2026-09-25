@@ -65,6 +65,9 @@ public partial class App : Application
 
             Db.Initialize();
             Db.Log("INFO", $"CamfrogMultiID v{AppVersion} starting. PID={Environment.ProcessId}");
+            Db.Log("INFO", Paths.SecretsAclRestricted
+                ? "Secrets: DPAPI protected, directory ACL restricted to current user."
+                : "Secrets: DPAPI protected, directory ACL hardening unavailable.");
 
             var window = new MainWindow();
             MainWindow = window;
