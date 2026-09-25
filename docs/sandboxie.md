@@ -23,8 +23,14 @@ Per account start with sandboxing enabled:
 Start.exe /wait /Box:<sanitized-username> "<client.exe>" <args> [--url="<room>"]
 ```
 
-Box names are passed **unquoted** (the sanitizer emits letters/digits
-only, max 32 chars, matching Sandboxie's own naming rule).
+Box names are passed **unquoted** (the sanitizer emits letters/digits/
+underscore only, max 32 chars, matching the engine rule in
+`Parse_Command_Line`; underscores are preserved so boxes stay
+recognizable next to nicknames like `_oIo_`).
+
+> Note: builds before this fix stripped underscores (`_oIo_` → `oIo`).
+> If such a box was already created, it is simply left unused — delete
+> it in SandMan or leave it; nothing references it.
 
 Source-verified in `Sandboxie/apps/start/start.cpp` (see
 `third_party/README.md` for the reference pin):

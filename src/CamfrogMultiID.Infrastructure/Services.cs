@@ -839,8 +839,12 @@ public sealed class ProcessSessionService
 
     public static string SanitizeBoxName(CamfrogAccount account)
     {
+        // Matches the Sandboxie engine rule (start.cpp Parse_Command_Line):
+        // letters, digits, and underscore only, max 32 chars. Underscores
+        // are preserved so box names stay recognizable next to nicknames
+        // such as "_oIo_".
         ArgumentNullException.ThrowIfNull(account);
-        var base_name = new string(account.Username.Where(char.IsLetterOrDigit).ToArray());
+        var base_name = new string(account.Username.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
         if (base_name.Length > 32)
             base_name = base_name.Substring(0, 32);
         if (string.IsNullOrEmpty(base_name))

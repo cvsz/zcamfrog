@@ -154,9 +154,22 @@ public sealed class AccountManagementTests : IDisposable
     public void SanitizeBoxName_KeepsAlphanumerics()
     {
         var acc = new CamfrogAccount { Id = 7, Username = "User-1_2!" };
-        Assert.Equal("User12", ProcessSessionService.SanitizeBoxName(acc));
+        Assert.Equal("User1_2", ProcessSessionService.SanitizeBoxName(acc));
         var empty = new CamfrogAccount { Id = 7, Username = "---" };
         Assert.Equal("account7", ProcessSessionService.SanitizeBoxName(empty));
+    }
+
+    [Fact]
+    public void SanitizeBoxName_PreservesUnderscores()
+    {
+        // Regression: nicknames like "_oIo_" must keep their underscores
+        // (Sandboxie engine allows them); stripping caused mismatches.
+        var acc = new CamfrogAccount { Id = 9, Username = "   _oIo_    ".Trim() };
+        Assert.Equal("_oIo_", ProcessSessionService.SanitizeBoxName(acc));
+        var longName = new CamfrogAccount { Id = 9, Username = new string('a', 20) + "_tail_end_here" };
+        var sanitized = ProcessSessionService.SanitizeBoxName(longName);
+        Assert.Equal(32, sanitized.Length);
+        Assert.DoesNotContain(" ", sanitized, StringComparison.Ordinal);
     }
 
     [Fact]
