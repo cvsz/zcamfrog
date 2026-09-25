@@ -233,23 +233,29 @@ public sealed class AccountManagementTests : IDisposable
         Assert.Contains("-EncodedCommand", args, StringComparison.Ordinal);
         var encoded = args.Substring(args.IndexOf("-EncodedCommand", StringComparison.Ordinal) + "-EncodedCommand".Length).Trim();
         var script = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
-        Assert.Contains(@"C:\sb\Start.exe", script, StringComparison.Ordinal);
-        Assert.Contains("BoxA", script, StringComparison.Ordinal);
-        Assert.Contains("BoxB", script, StringComparison.Ordinal);
+        Assert.Contains("SbieIni.exe", script, StringComparison.Ordinal);
+        Assert.Contains("set BoxA Enabled y", script, StringComparison.Ordinal);
+        Assert.Contains("set BoxB Enabled y", script, StringComparison.Ordinal);
         Assert.DoesNotContain("runas", script, StringComparison.OrdinalIgnoreCase);
         Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand("", SampleBoxes));
         Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand(@"C:\sb\Start.exe", NoBoxes));
     }
 
     [Fact]
-    public void BuildCreateBoxArguments_PassesBoxUnquoted()
+    public void BuildSbieIniSetArguments_FormatsSetCommand()
     {
-        // Sandboxie's parser rejects quoted box names (Sbie 3204), and
-        // SanitizeBoxName output never needs quoting anyway.
-        var args = ProcessSessionService.BuildCreateBoxArguments("MyBox");
-        Assert.Contains("/Box:MyBox ", args, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"MyBox\"", args, StringComparison.Ordinal);
-        Assert.Contains("cmd.exe", args, StringComparison.Ordinal);
+        Assert.Equal("set MyBox Enabled y", ProcessSessionService.BuildSbieIniSetArguments("MyBox"));
+        Assert.Equal("set X Enabled y", ProcessSessionService.BuildSbieIniSetArguments("  X  "));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildSbieIniSetArguments("   "));
+    }
+
+    [Fact]
+    public void FindSbieIni_SitsNextToStartExe()
+    {
+        Assert.Equal(
+            Path.Combine("C:", "sb", "SbieIni.exe"),
+            ProcessSessionService.FindSbieIni(Path.Combine("C:", "sb", "Start.exe")));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.FindSbieIni("   "));
     }
 
     [Fact]

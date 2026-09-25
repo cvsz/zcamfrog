@@ -47,6 +47,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 ### Fixed
 - Auto-restart loop guard never tripped: budget was reset on every successful (re)start; now resets only on manual start/stop
 - Sandboxie "Invalid box name parameter" (Sbie 3204): unquoted box names + auto-ensure box exists; readiness gate for missing driver/service
+- Sandboxie box creation corrected to `SbieIni.exe set <box> Enabled y`: probing with `Start.exe /Box:` never persisted anything (verified live); two `/wait` instances proven coexisting
 - `param()`-after-statements parse bug in `bundle-setup.ps1`/`package-msix.ps1` (CLI args were unbindable)
 - Backup of live DB failed on SQLite lock (`VACUUM INTO` snapshot); restore pool lock (`ClearAllPools`)
 - `CredentialService.Save(null)` throws `ArgumentNullException` via `ThrowIfNullOrWhiteSpace`

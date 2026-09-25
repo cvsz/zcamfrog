@@ -46,17 +46,21 @@ after deleting the box externally. It is not (only) about illegal
 characters: even `DefaultBox` triggers it when the config is missing.
 
 The manager therefore ensures the box exists on every sandboxed start
-(idempotent `Start.exe /Box:<name> cmd.exe /c exit`) before launching
-the client. If that fails, start aborts with the Sandboxie error
-instead of a bare 3204 popup. Use Settings → "Create Boxes For All
-Accounts" to pre-create boxes and surface service problems early.
+(idempotent `SbieIni.exe set <name> Enabled y`, resolved next to
+`Start.exe`) before launching the client. Probing with
+`Start.exe /Box:<name> cmd.exe` does **not** persist anything — only
+the config write makes `SbieApi_IsBoxEnabled` succeed (verified live:
+`Seaza` + `_oIo_` created, then two `/wait` instances alive
+simultaneously). If creation fails, start aborts with the Sandboxie
+error instead of a bare 3204 popup. Use Settings → "Create Boxes For
+All Accounts" to pre-create boxes and surface service problems early.
 
 - `/wait` keeps `Start.exe` alive while the sandboxed client runs, so
   the tracked PID stays valid for PID/start-time/executable checks
   (which then apply to `Start.exe` itself).
-- Box names are derived from the username (letters/digits, max 32
-  chars, `account<id>` fallback).
-- Boxes are created on demand via `Start.exe /Box:<name> cmd.exe /c exit`
+- Box names are derived from the username (letters/digits/underscore,
+  max 32 chars, `account<id>` fallback).
+- Boxes are created on demand via `SbieIni.exe set <name> Enabled y`
   ("Create Boxes For All Accounts", or implicitly on first start).
 - Default boxes root: `C:\Sandbox\<WindowsUser>\<Box>` (overridable in
   tests via `CAMFROGMULTIID_SANDBOX_ROOT`).

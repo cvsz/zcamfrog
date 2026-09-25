@@ -1077,8 +1077,26 @@ public sealed class ProcessSessionService
         catch (UnauthorizedAccessException) { return false; }
     }
 
-    public static string BuildCreateBoxArguments(string boxName) =>
-        $"/Box:{boxName} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+    public static string FindSbieIni(string startExe)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        var dir = Path.GetDirectoryName(Path.GetFullPath(startExe));
+        return string.IsNullOrWhiteSpace(dir) ? "SbieIni.exe" : Path.Combine(dir, "SbieIni.exe");
+    }
+
+    /// <summary>
+    /// Arguments that persistently create a box via the config tool.
+    /// Proven over Start.exe probing: only a config write makes
+    /// SbieApi_IsBoxEnabled succeed; a bare Start into an unknown box
+    /// exits without creating anything.
+    /// </summary>
+    public static string BuildSbieIniSetArguments(string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        return $"set {boxName.Trim()} Enabled y";
+    }
+
+
 
     /// <summary>
     /// Builds an elevated launcher that creates every box (box creation
@@ -1101,8 +1119,9 @@ public sealed class ProcessSessionService
         if (distinct.Count == 0)
             throw new ArgumentException("At least one box name is required.", nameof(boxNames));
 
+        var sbieIni = FindSbieIni(Path.GetFullPath(startExe));
         var script = string.Join("; ", distinct.Select(box =>
-            $"& '{startExe.Replace("'", "''", StringComparison.Ordinal)}' /Box:{box} \"$env:SystemRoot\\System32\\cmd.exe\" /c exit")) +
+            $"& '{sbieIni.Replace("'", "''", StringComparison.Ordinal)}' set {box} Enabled y")) +
             "; exit $LASTEXITCODE";
         // -EncodedCommand avoids all nested-quoting hazards.
         var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
@@ -1130,18 +1149,22 @@ public sealed class ProcessSessionService
         ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
         if (!File.Exists(startExe))
             throw new FileNotFoundException("Sandboxie Start.exe was not found.", startExe);
+        var sbieIni = FindSbieIni(startExe);
+        if (!File.Exists(sbieIni))
+            throw new FileNotFoundException("Sandboxie SbieIni.exe was not found next to Start.exe.", sbieIni);
+        // SbieIni persists the box section; probing with Start.exe alone
+        // exits without creating anything (verified against start.cpp).
         using var process = Process.Start(new ProcessStartInfo
         {
-            FileName = startExe,
-            Arguments = BuildCreateBoxArguments(boxName),
+            FileName = sbieIni,
+            Arguments = BuildSbieIniSetArguments(boxName),
             UseShellExecute = false,
             CreateNoWindow = true
-        }) ?? throw new InvalidOperationException("Could not start Sandboxie Start.exe.");
-        // cmd /c exit terminates immediately; the box persists afterwards.
+        }) ?? throw new InvalidOperationException("Could not start Sandboxie SbieIni.exe.");
         if (!process.WaitForExit(30000))
             throw new TimeoutException($"Timed out creating Sandboxie box '{boxName}'.");
         if (process.ExitCode != 0)
-            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}.");
+            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}. Run as administrator if the configuration is not writable.");
     }
 
     public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)
