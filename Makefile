@@ -27,7 +27,7 @@ test:
 
 build:
 	dotnet build CamfrogMultiID.sln -c Debug --no-restore
-dotnet build CamfrogMultiID.sln -c Release --no-restore
+	dotnet build CamfrogMultiID.sln -c Release --no-restore
 
 publish:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./build-release.ps1
