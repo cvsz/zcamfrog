@@ -509,4 +509,10 @@
   <data name="MsgAdminLaunchFailed" xml:space="preserve">
     <value>Unable to launch the elevated helper.{0}{0}{1}</value>
   </data>
+  <data name="ColPresence" xml:space="preserve">
+    <value>Presence</value>
+  </data>
+  <data name="ColRoom" xml:space="preserve">
+    <value>Room</value>
+  </data>
 </root>

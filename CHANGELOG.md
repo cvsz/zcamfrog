@@ -2,6 +2,17 @@
 
 All notable changes to Camfrog Multi-ID Manager are documented here. Based on Keep a Changelog and Semantic Versioning.
 
+## [1.3.0] - 2026-09-25
+### Added
+- Health dashboard (per-account running/error lines, 30-event feed)
+- One-click elevated Sandboxie box creation with UAC prompt
+- Version 1.3.0 stamped into the executable and window title
+
+### Fixed
+- Stop now terminates Sandboxie box contents (`/terminate`) instead of only killing `Start.exe`
+- Sandboxie boxes created via `SbieIni` (probing with `Start.exe` never persisted); underscore box names preserved and unquoted
+- Sandboxie readiness gate (driver/service check) with plain-language errors
+
 ## [1.1.0] - 2026-09-24
 ### Added
 - Pre-start foreign-client warning: starting while an untracked copy of the client runs now asks first (single-instance handoff exits in ~1s otherwise); tray-minimized copies called out explicitly
@@ -12,8 +23,12 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - `ABOUT.md`, `GOVERNANCE.md`, `CONTRIBUTING.md`, `.env.example`, `CODEOWNERS` rewritten from template-generic to project-specific; unused `FUNDING.yml` removed
 
 ## [Unreleased]
+### Added
+- Online/offline + room dashboard: Presence/Room grid columns, honest join evidence (live client command lines scanned for the room link; server-side membership correctly reported as unobservable), room name parsing
+
 ### Fixed
 - Stop left sandboxed clients running: killing `Start.exe` does not stop a Sandboxie box. Stop now runs `Start.exe /Box:<name> /terminate` first (verified live), then falls back to process-tree kill
+- Mojibake repair: em-dashes typed through an editing channel had corrupted into Thai glyphs in code; replaced by codepoint, repo-wide scan clean (only legitimate Thai remains)
 
 ### Added
 - Thai translation repair: 118 values damaged by an editing channel rewritten verified-clean (0 control chars, exact codepoints); regression test guards the class; Thai-capable font fallback on log/details panes

@@ -509,4 +509,10 @@
   <data name="MsgAdminLaunchFailed" xml:space="preserve">
     <value>เปิดตัวช่วยแบบยกระดับไม่ได้{0}{0}{1}</value>
   </data>
+  <data name="ColPresence" xml:space="preserve">
+    <value>สถานะออนไลน์</value>
+  </data>
+  <data name="ColRoom" xml:space="preserve">
+    <value>ห้อง</value>
+  </data>
 </root>

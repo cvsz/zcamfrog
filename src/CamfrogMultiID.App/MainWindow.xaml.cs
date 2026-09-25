@@ -1,4 +1,4 @@
-﻿using CamfrogMultiID.Infrastructure;
+using CamfrogMultiID.Infrastructure;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -191,6 +191,7 @@ public partial class MainWindow : Window
             }
 
             var all = App.Db.GetAccounts();
+            ApplyPresenceView(all);
             var filter = SearchBox?.Text?.Trim() ?? string.Empty;
             List<CamfrogAccount> view = string.IsNullOrWhiteSpace(filter)
                 ? all
@@ -240,24 +241,53 @@ public partial class MainWindow : Window
         var preview = ProcessSessionService.PreviewLaunch(settings, account);
         var secretExists = App.Credentials.Exists(account.PasswordSecretName);
         var profileExists = Directory.Exists(account.ProfileDirectory);
-        var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "โ€”";
+        var startedLocal = account.StartedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture) ?? "—€”";
         var uptime = account.StartedAtUtc is DateTime started && account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase)
             ? FormatDuration(DateTime.UtcNow - started.ToUniversalTime())
-            : "โ€”";
+            : "—€”";
         var restarts = _restartPolicy.GetAttemptCount(account.Id, DateTime.UtcNow);
         var passwordAge = account.PasswordChangedUtc is DateTime changed
             ? $"{(int)(DateTime.UtcNow - changed.ToUniversalTime()).TotalDays}d" + ((DateTime.UtcNow - changed.ToUniversalTime()).TotalDays > 90 ? " (rotation recommended)" : string.Empty)
             : "unknown";
         DetailsBox.Text =
             $"Id: {account.Id}  Display: {account.DisplayName}  User: {account.Username}  Enabled: {account.Enabled}  Status: {account.Status}  AutoRestart: {account.AutoRestart}\n" +
-            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "โ€”")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "โ€”")}  Local: {startedLocal}  Uptime: {uptime}  Restarts(10m): {restarts}\n" +
+            $"PID: {(account.ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—€”")}  Started UTC: {(account.StartedAtUtc?.ToString("O") ?? "—€”")}  Local: {startedLocal}  Uptime: {uptime}  Restarts(10m): {restarts}\n" +
             $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
-            $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "โ€”" : account.ProcessExecutablePath)}\n" +
-            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "โ€”" : account.RoomUrl)}  Password age: {passwordAge}\n" +
+            $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—€”" : account.ProcessExecutablePath)}\n" +
+            $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—€”" : account.RoomUrl)}  Password age: {passwordAge}  Presence: {account.PresenceDisplay}\n" +
             (settings.UseSandboxie
-                ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created โ€” use Settings]")}\n"
+                ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created —€” use Settings]")}\n"
                 : string.Empty) +
             $"Launch: {preview}";
+    }
+
+    private static void ApplyPresenceView(List<CamfrogAccount> all)
+    {
+        IReadOnlyList<ProcessSessionService.LiveClient> live = [];
+        try
+        {
+            var exe = App.Settings.Load().ClientExecutable;
+            if (!string.IsNullOrWhiteSpace(exe))
+                live = ProcessSessionService.GetLiveClients(exe);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        foreach (var account in all)
+        {
+            try
+            {
+                var trackedAlive = account.ProcessId is int &&
+                    ProcessSessionService.IsTrackedProcessAlive(account, out _);
+                var view = ProcessSessionService.BuildPresenceView(account, live, trackedAlive);
+                account.PresenceDisplay = view.PresenceDisplay;
+                account.RoomDisplay = view.RoomDisplay;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                account.PresenceDisplay = "Unknown";
+                account.RoomDisplay = ProcessSessionService.ParseRoomName(account.RoomUrl);
+            }
+        }
     }
 
     private static string FormatDuration(TimeSpan span)

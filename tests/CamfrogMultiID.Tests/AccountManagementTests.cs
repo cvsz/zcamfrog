@@ -242,6 +242,43 @@ public sealed class AccountManagementTests : IDisposable
     }
 
     [Fact]
+    public void ParseRoomName_ExtractsName()
+    {
+        Assert.Equal("ZeaZDev", ProcessSessionService.ParseRoomName("camfrog://join_room/?name=ZeaZDev"));
+        Assert.Equal("My Room", ProcessSessionService.ParseRoomName("camfrog://join_room/?name=My+Room"));
+        Assert.Equal(string.Empty, ProcessSessionService.ParseRoomName("camfrog://join_room/"));
+        Assert.Equal(string.Empty, ProcessSessionService.ParseRoomName(""));
+        Assert.Equal(string.Empty, ProcessSessionService.ParseRoomName(null));
+    }
+
+    [Fact]
+    public void BuildPresenceView_StatesAreHonest()
+    {
+        var offline = new CamfrogAccount { RoomUrl = "camfrog://join_room/?name=R" };
+        var offlineView = ProcessSessionService.BuildPresenceView(offline, new List<ProcessSessionService.LiveClient>(), false);
+        Assert.False(offlineView.Online);
+        Assert.Equal("Offline", offlineView.PresenceDisplay);
+        Assert.False(offlineView.JoinRequested);
+
+        var runningNoRoom = new CamfrogAccount();
+        var runningView = ProcessSessionService.BuildPresenceView(runningNoRoom, new List<ProcessSessionService.LiveClient>(), true);
+        Assert.True(runningView.Online);
+        Assert.False(runningView.JoinRequested);
+
+        var withRoom = new CamfrogAccount { RoomUrl = "camfrog://join_room/?name=R" };
+        var live = new List<ProcessSessionService.LiveClient>
+        {
+            new(111, "client.exe --url=\"camfrog://join_room/?name=R\"", DateTime.UtcNow)
+        };
+        var joined = ProcessSessionService.BuildPresenceView(withRoom, live, true);
+        Assert.True(joined.JoinRequested);
+        Assert.Equal("R", joined.RoomName);
+        var unobserved = ProcessSessionService.BuildPresenceView(withRoom, new List<ProcessSessionService.LiveClient>(), true);
+        Assert.False(unobserved.JoinRequested);
+        Assert.Contains("not observed", unobserved.RoomDisplay, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildTerminateArguments_FormatsTerminate()
     {
         Assert.Equal("/Box:MyBox /terminate", ProcessSessionService.BuildTerminateArguments("MyBox"));

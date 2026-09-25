@@ -43,6 +43,8 @@
                     <DataGridTextColumn Header="{x:Static loc:Strings.ColUsername}" Binding="{Binding Username}" Width="150"/>
                     <DataGridCheckBoxColumn Header="{x:Static loc:Strings.ColEnabled}" Binding="{Binding Enabled}" Width="70"/>
                     <DataGridTextColumn Header="{x:Static loc:Strings.ColStatus}" Binding="{Binding Status}" Width="90"/>
+                    <DataGridTextColumn Header="{x:Static loc:Strings.ColPresence}" Binding="{Binding PresenceDisplay}" Width="90"/>
+                    <DataGridTextColumn Header="{x:Static loc:Strings.ColRoom}" Binding="{Binding RoomDisplay}" Width="200"/>
                     <DataGridTextColumn Header="{x:Static loc:Strings.ColPid}" Binding="{Binding ProcessId}" Width="70"/>
                     <DataGridTextColumn Header="{x:Static loc:Strings.ColStarted}" Binding="{Binding StartedAtUtc}" Width="170"/>
                     <DataGridTextColumn Header="{x:Static loc:Strings.ColError}" Binding="{Binding LastError}" Width="*"/>

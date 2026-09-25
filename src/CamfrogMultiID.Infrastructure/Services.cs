@@ -879,6 +879,127 @@ public sealed class ProcessSessionService
 
     public sealed record ForeignProcess(int ProcessId, string ExecutablePath, DateTime StartTimeUtc);
 
+    public sealed record LiveClient(int ProcessId, string CommandLine, DateTime StartTimeUtc);
+
+    public sealed record PresenceView(
+        bool Online,
+        string PresenceDisplay,
+        string RoomDisplay,
+        string RoomName,
+        bool JoinRequested);
+
+    /// <summary>
+    /// Extracts the room name from a camfrog://join_room/?name= link.
+    /// Returns empty when absent or malformed.
+    /// </summary>
+    public static string ParseRoomName(string? roomUrl)
+    {
+        if (string.IsNullOrWhiteSpace(roomUrl))
+            return string.Empty;
+        var query = roomUrl.Trim();
+        var question = query.IndexOf('?');
+        if (question < 0 || question == query.Length - 1)
+            return string.Empty;
+        foreach (var pair in query.Substring(question + 1).Split('&'))
+        {
+            var kv = pair.Split('=', 2);
+            if (kv.Length == 2 && string.Equals(kv[0], "name", StringComparison.OrdinalIgnoreCase))
+                return Uri.UnescapeDataString(kv[1].Replace("+", " ", StringComparison.Ordinal)).Trim();
+        }
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Scans live client processes (by executable file name) and reads
+    /// their command lines. Best-effort: processes that vanish or deny
+    /// access are skipped.
+    /// </summary>
+    public static IReadOnlyList<LiveClient> GetLiveClients(string clientExecutable)
+    {
+        var result = new List<LiveClient>();
+        string processName;
+        try
+        {
+            processName = Path.GetFileNameWithoutExtension(Path.GetFullPath(clientExecutable));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return result;
+        }
+        if (string.IsNullOrWhiteSpace(processName))
+            return result;
+
+        Process[] candidates;
+        try { candidates = Process.GetProcessesByName(processName); }
+        catch (InvalidOperationException) { return result; }
+
+        foreach (var candidate in candidates)
+        {
+            using (candidate)
+            {
+                try
+                {
+                    if (candidate.HasExited)
+                        continue;
+                    var cmdline = GetCommandLine(candidate.Id);
+                    DateTime started;
+                    try { started = candidate.StartTime.ToUniversalTime(); }
+                    catch (InvalidOperationException) { continue; }
+                    catch (System.ComponentModel.Win32Exception) { continue; }
+                    result.Add(new LiveClient(candidate.Id, cmdline, started));
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            }
+        }
+        return result;
+    }
+
+    private static string GetCommandLine(int pid)
+    {
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher(
+                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {pid}");
+            foreach (var obj in searcher.Get())
+            {
+                using (obj)
+                {
+                    return obj["CommandLine"]?.ToString() ?? string.Empty;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException or System.Management.ManagementException)
+        {
+        }
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Builds the per-account presence/room view. Honest by design: the
+    /// manager can prove a client runs and was launched with a room link,
+    /// but server-side room membership is not visible locally.
+    /// </summary>
+    public static PresenceView BuildPresenceView(CamfrogAccount account, IReadOnlyList<LiveClient> liveClients, bool trackedAlive)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        ArgumentNullException.ThrowIfNull(liveClients);
+        var roomName = ParseRoomName(account.RoomUrl);
+        if (!trackedAlive)
+            return new PresenceView(false, "Offline", string.IsNullOrEmpty(roomName) ? "—" : roomName, roomName, false);
+        if (string.IsNullOrEmpty(roomName))
+            return new PresenceView(true, "Online", "—", string.Empty, false);
+        var observed = liveClients.Any(c =>
+            !string.IsNullOrEmpty(c.CommandLine) &&
+            c.CommandLine.Contains(account.RoomUrl.Trim(), StringComparison.OrdinalIgnoreCase));
+        return new PresenceView(
+            true,
+            "Online",
+            observed ? roomName : roomName + " (not observed)",
+            roomName,
+            observed);
+    }
+
     /// <summary>
     /// Finds client processes that the manager does not track (e.g. a copy
     /// the user started by hand). A second launch while one of these lives

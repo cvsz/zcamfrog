@@ -304,7 +304,7 @@ dotnet build .\CamfrogMultiID.sln -c Release --no-restore
 dotnet test .\CamfrogMultiID.sln -c Release --no-build
 ```
 
-90 tests pass (see CHANGELOG for the full list). Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
+94 tests pass (see CHANGELOG for the full list). Publish: `.\build-release.ps1` → `src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish\CamfrogMultiID.exe` (self-contained, single-file). MSIX via `.\package-msix.ps1` once the Windows SDK is present.
 
 ## V20 Thai localization
 

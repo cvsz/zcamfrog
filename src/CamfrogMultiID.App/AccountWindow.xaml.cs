@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using CamfrogMultiID.Core;
@@ -16,7 +16,7 @@ public partial class AccountWindow : Window
     {
         ArgumentNullException.ThrowIfNull(existing);
         _editing = existing;
-        Title = $"{Strings.TitleEditAccount} โ€” {existing.DisplayName}";
+        Title = $"{Strings.TitleEditAccount} —€” {existing.DisplayName}";
         DisplayNameTextBox.Text = existing.DisplayName;
         UsernameTextBox.Text = existing.Username;
         RoomUrlTextBox.Text = existing.RoomUrl;

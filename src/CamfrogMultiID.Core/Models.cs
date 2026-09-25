@@ -16,6 +16,9 @@ public sealed class CamfrogAccount
     public string RoomUrl { get; set; } = string.Empty;
     public bool AutoRestart { get; set; }
     public DateTime? PasswordChangedUtc { get; set; }
+    // Transient UI-only view state. Never persisted: no reader/writer touches these.
+    public string PresenceDisplay { get; set; } = string.Empty;
+    public string RoomDisplay { get; set; } = string.Empty;
 }
 
 public sealed class AppSettings
