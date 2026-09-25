@@ -7,51 +7,51 @@ namespace CamfrogMultiID.Infrastructure;
 /// </summary>
 public sealed class RestartPolicy
 {
-    public static int MaxRestarts { get; } = 3;
-    public static TimeSpan Window { get; } = TimeSpan.FromMinutes(10);
+  public static int MaxRestarts { get; } = 3;
+  public static TimeSpan Window { get; } = TimeSpan.FromMinutes(10);
 
-    private readonly Dictionary<long, Queue<DateTime>> _attempts = new();
-    private readonly object _gate = new();
+  private readonly Dictionary<long, Queue<DateTime>> _attempts = new();
+  private readonly object _gate = new();
 
-    public bool ShouldRestart(long accountId, DateTime nowUtc)
+  public bool ShouldRestart(long accountId, DateTime nowUtc)
+  {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(accountId);
+    lock (_gate)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(accountId);
-        lock (_gate)
-        {
-            if (!_attempts.TryGetValue(accountId, out var queue))
-            {
-                queue = new Queue<DateTime>();
-                _attempts[accountId] = queue;
-            }
+      if (!_attempts.TryGetValue(accountId, out var queue))
+      {
+        queue = new Queue<DateTime>();
+        _attempts[accountId] = queue;
+      }
 
-            while (queue.Count > 0 && (nowUtc - queue.Peek()) > Window)
-                queue.Dequeue();
+      while (queue.Count > 0 && (nowUtc - queue.Peek()) > Window)
+        queue.Dequeue();
 
-            if (queue.Count >= MaxRestarts)
-                return false;
+      if (queue.Count >= MaxRestarts)
+        return false;
 
-            queue.Enqueue(nowUtc);
-            return true;
-        }
+      queue.Enqueue(nowUtc);
+      return true;
     }
+  }
 
-    public int GetAttemptCount(long accountId, DateTime nowUtc)
+  public int GetAttemptCount(long accountId, DateTime nowUtc)
+  {
+    lock (_gate)
     {
-        lock (_gate)
-        {
-            if (!_attempts.TryGetValue(accountId, out var queue))
-                return 0;
-            while (queue.Count > 0 && (nowUtc - queue.Peek()) > Window)
-                queue.Dequeue();
-            return queue.Count;
-        }
+      if (!_attempts.TryGetValue(accountId, out var queue))
+        return 0;
+      while (queue.Count > 0 && (nowUtc - queue.Peek()) > Window)
+        queue.Dequeue();
+      return queue.Count;
     }
+  }
 
-    public void Reset(long accountId)
+  public void Reset(long accountId)
+  {
+    lock (_gate)
     {
-        lock (_gate)
-        {
-            _attempts.Remove(accountId);
-        }
+      _attempts.Remove(accountId);
     }
+  }
 }
