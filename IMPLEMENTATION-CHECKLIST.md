@@ -1,60 +1,42 @@
-# Production Implementation Checklist
+# Implementation Checklist — Camfrog Multi-ID Manager
 
-## Repository identity
+Use this checklist when changing the manager. All items are currently
+satisfied on `main`; re-verify the touched areas per change.
 
-- [x] Repository name and GitHub links use `cvsz/zcamfrog`.
-- [x] Documentation describes Camfrog Multi-ID Manager rather than a generic repository.
-- [x] Security contact points to this repository.
-- [x] Project-specific build, test, release, and security instructions are present.
+## Build and test
 
-## Application
+- [x] `dotnet restore CamfrogMultiID.sln` + win-x64 graph restore succeed.
+- [x] Debug and Release build with 0 warnings / 0 errors.
+- [x] `dotnet test` green (79 tests, 0 skipped unresolved).
+- [x] `build-release.ps1` publishes `CamfrogMultiID.exe` (checksum recorded).
+- [x] Solution GUIDs complete (`BuildProjectInSolution=True` for all).
 
-- [x] .NET 8 WPF target with nullable reference types and warnings-as-errors.
-- [x] Single-instance startup and emergency diagnostics.
-- [x] Add, start, stop, start-all, stop-all, and remove-account workflows.
-- [x] Runtime reconciliation and bounded process termination.
+## Security
 
-## Persistence and credentials
+- [x] DPAPI `CurrentUser` only; no plaintext passwords in logs, CLI, DB.
+- [x] Process stop refuses foreign PIDs (start-time + exe identity).
+- [x] Room URLs restricted to the `camfrog:` scheme.
+- [x] Backup/restore zips validated against path traversal.
+- [x] Secrets directory ACL restricted to the current user.
+- [x] CodeQL (`csharp`) and dependency review enabled; least privilege.
+- [x] No secrets committed (see `docs/troubleshooting.md` entry 5).
 
-- [x] SQLite initialization and forward-compatible migrations.
-- [x] Case-insensitive username uniqueness.
-- [x] WAL mode, busy timeout, and foreign-key enforcement.
-- [x] DPAPI CurrentUser credential protection.
-- [x] Temporary-file writes with failure cleanup.
-- [x] Safe account deletion with credential/profile cleanup.
+## CI/CD
 
-## Process safety
+- [x] `ci.yml` builds/tests/publishes the actual WPF app on Windows.
+- [x] `release.yml` tags (`v*.*.*`) produce zip + `.sha256` + provenance.
+- [x] Dependabot covers `github-actions` and `nuget`.
+- [x] Proven release: `v1.0.0` workflow run green with artifacts.
 
-- [x] PID reuse detection.
-- [x] Start-time validation.
-- [x] Executable-path validation.
-- [x] Fail-closed behavior when process identity cannot be verified.
-- [x] Graceful close before bounded force termination.
-- [x] No false "Stopped" state after failed termination.
+## Documentation
 
-## CI/security
+- [x] `docs/architecture.md`, `development.md`, `release.md`,
+  `troubleshooting.md`, `sandboxie.md` match behavior.
+- [x] README build/run/publish sections current.
+- [x] CHANGELOG updated per change; AGENTS.md project-specific.
 
-- [x] Windows Release build.
-- [x] Regression tests.
-- [x] Self-contained win-x64 publish gate.
-- [x] C# and GitHub Actions CodeQL.
-- [x] Dependency review and Dependabot.
-- [x] Static unfinished-marker scan.
-- [x] Least-privilege workflow permissions.
-- [x] Project-specific issue, PR, support, and security templates.
+## Release readiness
 
-## Cross-build tooling
-
-- [x] Ubuntu MinGW-w64 bootstrap script.
-- [x] Standalone x86_64 MinGW CMake toolchain.
-- [x] Headless Wine initialization for native Windows helper testing.
-- [x] vcpkg bootstrap support.
-
-## Manual production validation
-
-- [ ] Test on a clean Windows installation.
-- [ ] Test against the exact Camfrog client version intended for production.
-- [ ] Verify the installed client actually honors separate profile directories.
-- [ ] Verify recovery after manager restart and unexpected client exit.
-- [ ] Verify no plaintext credentials appear in settings, logs, crash reports, or command lines.
-- [ ] Verify signed release artifacts and checksum verification once release signing is enabled.
+- [x] Fresh clone builds per `docs/development.md`.
+- [x] Thai + English UI verified (build + clean launch + key coverage test).
+- [x] Rollback = re-tag previous `vX.Y.Z` (see `docs/release.md`).

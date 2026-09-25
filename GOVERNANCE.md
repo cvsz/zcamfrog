@@ -1,23 +1,22 @@
-# Governance
+# Governance — Camfrog Multi-ID Manager
 
-## Scope
-
-This repository contains the Camfrog Multi-ID Manager desktop application and its build, test, and security automation.
-
-## Roles
-
-- **Maintainers** review changes, protect application quality and security, and manage releases.
-- **Contributors** propose changes through issues and pull requests and follow `CONTRIBUTING.md`.
-- **Security contacts** receive vulnerability reports through `SECURITY.md`.
+## Maintainer
+[@cvsz](https://github.com/cvsz) — reviews changes, protects quality and
+security, manages releases and tags.
 
 ## Decisions
+- Small, reviewable changes on `main` (feature branches for larger work).
+- Material architecture/security/release decisions recorded as ADRs under
+  `docs/adr/` or in `CHANGELOG.md`.
+- Security-sensitive changes require extra review and must fail closed.
 
-Material architecture or security decisions should use an ADR under `docs/adr/`. Security-sensitive process lifecycle, credential storage, persistence, or release changes require regression tests.
+## Change rules
+- Follow `AGENTS.md` (agent contract) and `CONTRIBUTING.md` (workflow).
+- GPG-sign commits. Do not rewrite pushed history except an explicitly
+  approved resign sweep (`--force-with-lease` only).
+- CI (`CI`, `CodeQL`, `Dependency Review`) must be green; `release.yml`
+  tags (`v*.*.*`) produce signed-release artifacts with provenance.
 
-## Changes
-
-Normal changes flow through pull requests with required checks. Emergency changes should still be documented and reviewed as soon as practical.
-
-## Amendments
-
-Governance changes are made by pull request and should explain the reason, impact, and migration expectations.
+## Support
+See `.github/SUPPORT.md`. Security reports go through `SECURITY.md`
+channels, never public issues.

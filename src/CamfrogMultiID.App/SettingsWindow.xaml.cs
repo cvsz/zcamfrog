@@ -24,6 +24,7 @@ public partial class SettingsWindow : Window
         SandboxExe.Text = settings.SandboxieStartExe;
         BackupDays.Text = settings.AutoBackupDays.ToString(CultureInfo.InvariantCulture);
         BackupKeep.Text = settings.AutoBackupKeepCount.ToString(CultureInfo.InvariantCulture);
+        AutoStartBox.IsChecked = settings.AutoStartAccounts;
         SelectLanguage(settings.Language);
         _initialLanguage = NormalizeLanguage(settings.Language);
         UpdateSandboxStatus();
@@ -101,12 +102,14 @@ public partial class SettingsWindow : Window
     private void UpdateSandboxStatus()
     {
         var configured = SandboxExe.Text.Trim();
-        var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
-        if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved))
+        if (!ProcessSessionService.IsSandboxieReady(configured, out var readiness))
         {
-            SandboxStatus.Text = Strings.SandboxStatusNone;
+            SandboxStatus.Text = string.IsNullOrWhiteSpace(readiness)
+                ? Strings.SandboxStatusNone
+                : $"Sandboxie: not ready — {readiness}";
             return;
         }
+        var resolved = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart()! : configured;
         var version = ProcessSessionService.GetSandboxieVersion(resolved);
         SandboxStatus.Text = L10n.Fmt(Strings.SandboxStatusOk, resolved, ProcessSessionService.GetBoxesRoot())
             + (string.IsNullOrWhiteSpace(version) ? string.Empty : $" v{version}");
@@ -152,11 +155,54 @@ public partial class SettingsWindow : Window
         App.Db.Log("INFO", $"Created {ok} Sandboxie box(es).");
         MessageBox.Show(
             failures.Count == 0
-                ? L10n.Fmt(Strings.BoxesDone, ok)
-                : L10n.Fmt(Strings.BoxesDoneFailures, ok, Environment.NewLine, string.Join(Environment.NewLine, failures)),
+                ? (ok == 0
+                    ? Strings.BoxesNone
+                    : L10n.Fmt(Strings.BoxesDone, ok))
+                : L10n.Fmt(Strings.BoxesDoneFailures, ok, Environment.NewLine, string.Join(Environment.NewLine, failures))
+                    + Environment.NewLine + Environment.NewLine + Strings.BoxesElevationHint,
             Strings.TitleCreateBoxes,
             MessageBoxButton.OK,
             failures.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        UpdateSandboxStatus();
+    }
+
+    private void CreateBoxesAdmin_Click(object sender, RoutedEventArgs e)
+    {
+        var configured = SandboxExe.Text.Trim();
+        var startExe = string.IsNullOrWhiteSpace(configured) ? ProcessSessionService.FindSandboxieStart() : configured;
+        if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+        {
+            MessageBox.Show(Strings.MsgCreateBoxesNoExe, Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var boxes = App.Db.GetAccounts()
+            .Select(a => ProcessSessionService.SanitizeBoxName(a))
+            .Where(b => !string.IsNullOrWhiteSpace(b))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (boxes.Count == 0)
+        {
+            MessageBox.Show(Strings.BoxesNone, Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            // Raises the UAC prompt; declining throws and is reported, not fatal.
+            var exitCode = ProcessSessionService.CreateBoxesElevated(startExe, boxes);
+            if (exitCode == 0)
+            {
+                App.Db.Log("INFO", $"Created {boxes.Count} Sandboxie box(es) elevated.");
+                MessageBox.Show(L10n.Fmt(Strings.BoxesDone, boxes.Count), Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(L10n.Fmt(Strings.BoxesDoneFailures, 0, Environment.NewLine, $"Elevated helper exited with code {exitCode}.") + Environment.NewLine + Environment.NewLine + Strings.BoxesElevationHint, Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(L10n.Fmt(Strings.MsgAdminLaunchFailed, Environment.NewLine, ex.Message), Strings.TitleCreateBoxes, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         UpdateSandboxStatus();
     }
 
@@ -272,7 +318,7 @@ public partial class SettingsWindow : Window
         try
         {
             var current = App.Settings.Load();
-            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc, Language = language });
+            App.Settings.Save(new AppSettings { ClientExecutable = executable, ClientArgumentsTemplate = template, UseSandboxie = useSandboxie, SandboxieStartExe = sandboxExe, AutoBackupDays = backupDays, AutoBackupKeepCount = backupKeep, LastAutoBackupUtc = current.LastAutoBackupUtc, Language = language, AutoStartAccounts = AutoStartBox.IsChecked == true });
             App.Db.Log("INFO", "Settings saved.");
             if (!string.Equals(language, _initialLanguage, StringComparison.OrdinalIgnoreCase))
                 MessageBox.Show(Strings.MsgRestartRequired, Strings.TitleLanguage, MessageBoxButton.OK, MessageBoxImage.Information);

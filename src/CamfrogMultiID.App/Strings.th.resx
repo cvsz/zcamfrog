@@ -17,377 +17,377 @@
     <value>Camfrog Multi-ID Manager</value>
   </data>
   <data name="AddAccount" xml:space="preserve">
-    <value>+ เน€เธเธดเนเธกเธเธฑเธเธเธต</value>
+    <value>+ เพิ่มบัญชี</value>
   </data>
   <data name="Edit" xml:space="preserve">
-    <value>เนเธเนเนเธ...</value>
+    <value>แก้ไข...</value>
   </data>
   <data name="Delete" xml:space="preserve">
-    <value>เธฅเธ</value>
+    <value>ลบ</value>
   </data>
   <data name="EnableDisable" xml:space="preserve">
-    <value>เน€เธเธดเธ”/เธเธดเธ”เนเธเน</value>
+    <value>เปิด/ปิดใช้</value>
   </data>
   <data name="Settings" xml:space="preserve">
-    <value>เธ•เธฑเนเธเธเนเธฒ</value>
+    <value>ตั้งค่า</value>
   </data>
   <data name="StartSelected" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธ—เธตเนเน€เธฅเธทเธญเธ</value>
+    <value>เริ่มที่เลือก</value>
   </data>
   <data name="StopSelected" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธ—เธตเนเน€เธฅเธทเธญเธ</value>
+    <value>หยุดที่เลือก</value>
   </data>
   <data name="StartAll" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธ—เธฑเนเธเธซเธกเธ”</value>
+    <value>เริ่มทั้งหมด</value>
   </data>
   <data name="StopAll" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธ—เธฑเนเธเธซเธกเธ”</value>
+    <value>หยุดทั้งหมด</value>
   </data>
   <data name="Refresh" xml:space="preserve">
-    <value>เธฃเธตเน€เธเธฃเธ</value>
+    <value>รีเฟรช</value>
   </data>
   <data name="Search" xml:space="preserve">
-    <value>เธเนเธเธซเธฒ:</value>
+    <value>ค้นหา:</value>
   </data>
   <data name="ColId" xml:space="preserve">
     <value>ID</value>
   </data>
   <data name="ColAccount" xml:space="preserve">
-    <value>เธเธฑเธเธเธต</value>
+    <value>บัญชี</value>
   </data>
   <data name="ColUsername" xml:space="preserve">
-    <value>เธเธทเนเธญเธเธนเนเนเธเน</value>
+    <value>ชื่อผู้ใช้</value>
   </data>
   <data name="ColEnabled" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเน</value>
+    <value>เปิดใช้</value>
   </data>
   <data name="ColStatus" xml:space="preserve">
-    <value>เธชเธ–เธฒเธเธฐ</value>
+    <value>สถานะ</value>
   </data>
   <data name="ColPid" xml:space="preserve">
     <value>PID</value>
   </data>
   <data name="ColStarted" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธก (UTC)</value>
+    <value>เริ่ม (UTC)</value>
   </data>
   <data name="ColError" xml:space="preserve">
-    <value>เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>ข้อผิดพลาด</value>
   </data>
   <data name="SelectedAccount" xml:space="preserve">
-    <value>เธเธฑเธเธเธตเธ—เธตเนเน€เธฅเธทเธญเธ</value>
+    <value>บัญชีที่เลือก</value>
   </data>
   <data name="ApplicationLog" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธเธเธฒเธฃเธ—เธณเธเธฒเธ</value>
+    <value>บันทึกการทำงาน</value>
   </data>
   <data name="Level" xml:space="preserve">
-    <value>เธฃเธฐเธ”เธฑเธ:</value>
+    <value>ระดับ:</value>
   </data>
   <data name="AutoScroll" xml:space="preserve">
-    <value>เน€เธฅเธทเนเธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด</value>
+    <value>เลื่อนอัตโนมัติ</value>
   </data>
   <data name="ClearLogView" xml:space="preserve">
-    <value>เธฅเนเธฒเธเธซเธเนเธฒเธเธญ</value>
+    <value>ล้างหน้าจอ</value>
   </data>
   <data name="ExportLog" xml:space="preserve">
-    <value>เธชเนเธเธญเธญเธเธเธฑเธเธ—เธถเธ...</value>
+    <value>ส่งออกบันทึก...</value>
   </data>
   <data name="Diagnostics" xml:space="preserve">
-    <value>เธเนเธญเธกเธนเธฅเธงเธดเธเธดเธเธเธฑเธข...</value>
+    <value>ข้อมูลวินิจฉัย...</value>
   </data>
   <data name="OpenLogFolder" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเธฅเน€เธ”เธญเธฃเนเธเธฑเธเธ—เธถเธ</value>
+    <value>เปิดโฟลเดอร์บันทึก</value>
   </data>
   <data name="CtxStart" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธก</value>
+    <value>เริ่ม</value>
   </data>
   <data name="CtxStop" xml:space="preserve">
     <value>เธซเธขเธธเธ”</value>
   </data>
   <data name="CtxChangePassword" xml:space="preserve">
-    <value>เน€เธเธฅเธตเนเธขเธเธฃเธซเธฑเธชเธเนเธฒเธ...</value>
+    <value>เปลี่ยนรหัสผ่าน...</value>
   </data>
   <data name="CtxClearError" xml:space="preserve">
-    <value>เธฅเนเธฒเธเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>ล้างข้อผิดพลาด</value>
   </data>
   <!-- Account window -->
   <data name="AddAccountTitle" xml:space="preserve">
-    <value>เน€เธเธดเนเธกเธเธฑเธเธเธต Camfrog</value>
+    <value>เพิ่มบัญชี Camfrog</value>
   </data>
   <data name="DisplayName" xml:space="preserve">
-    <value>เธเธทเนเธญเนเธชเธ”เธ</value>
+    <value>ชื่อแสดง</value>
   </data>
   <data name="Username" xml:space="preserve">
-    <value>เธเธทเนเธญเธเธนเนเนเธเน</value>
+    <value>ชื่อผู้ใช้</value>
   </data>
   <data name="Password" xml:space="preserve">
-    <value>เธฃเธซเธฑเธชเธเนเธฒเธ</value>
+    <value>รหัสผ่าน</value>
   </data>
   <data name="NewPasswordTitle" xml:space="preserve">
-    <value>เธฃเธซเธฑเธชเธเนเธฒเธเนเธซเธกเน (เน€เธงเนเธเธงเนเธฒเธเน€เธเธทเนเธญเนเธเนเธเนเธฒเน€เธ”เธดเธก)</value>
+    <value>รหัสผ่านใหม่ (เว้นว่างเพื่อใช้ค่าเดิม)</value>
   </data>
   <data name="PasswordHintAdd" xml:space="preserve">
-    <value>เน€เธเนเธเธ”เนเธงเธข Windows DPAPI (CurrentUser) เนเธกเนเธเธฑเธเธ—เธถเธเธฅเธเธเธฑเธเธ—เธถเธเธซเธฃเธทเธญเธชเนเธเธเนเธฒเธ command line</value>
+    <value>เก็บด้วย Windows DPAPI (CurrentUser) ไม่บันทึกลงบันทึกหรือส่งผ่าน command line</value>
   </data>
   <data name="PasswordHintEdit" xml:space="preserve">
-    <value>เน€เธงเนเธเธงเนเธฒเธเน€เธเธทเนเธญเน€เธเนเธเธฃเธซเธฑเธชเธเนเธฒเธ DPAPI เน€เธ”เธดเธก เธเธฃเธญเธเธเนเธฒเนเธซเธกเนเน€เธเธทเนเธญเนเธ—เธเธ—เธตเน</value>
+    <value>เว้นว่างเพื่อเก็บรหัสผ่าน DPAPI เดิม กรอกค่าใหม่เพื่อแทนที่</value>
   </data>
   <data name="RoomUrlLabel" xml:space="preserve">
-    <value>URL เธซเนเธญเธ (เนเธกเนเธเธฑเธเธเธฑเธ เธฅเธดเธเธเน camfrog: เน€เธเธทเนเธญเน€เธเนเธฒเธซเนเธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด)</value>
+    <value>Room URL (optional, camfrog: link to auto-join)</value>
   </data>
   <data name="RoomUrlHint" xml:space="preserve">
-    <value>เธเธฒเธเธฅเธดเธเธเนเน€เธเนเธฒเธซเนเธญเธเธเธญเธ camfrog.com เน€เธเนเธ camfrog://join_room/?name=RoomName เธฃเธญเธเธฃเธฑเธเน€เธเธเธฒเธฐ scheme camfrog: เน€เธ—เนเธฒเธเธฑเนเธ</value>
+    <value>จากลิงก์เข้าห้องของ camfrog.com เช่น camfrog://join_room/?name=RoomName รองรับเฉพาะ scheme camfrog: เท่านั้น</value>
   </data>
   <data name="Enabled" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเนเธเธฒเธ</value>
+    <value>เปิดใช้งาน</value>
   </data>
   <data name="AutoRestartLabel" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเนเธซเธกเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธซเธฒเธเนเธเธฃเนเธเธฃเธกเธซเธขเธธเธ”เนเธ”เธขเนเธกเนเธเธฒเธ”เธเธดเธ”</value>
+    <value>เริ่มใหม่อัตโนมัติหากโปรแกรมหยุดโดยไม่คาดคิด</value>
   </data>
   <data name="Cancel" xml:space="preserve">
-    <value>เธขเธเน€เธฅเธดเธ</value>
+    <value>ยกเลิก</value>
   </data>
   <data name="Save" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธ</value>
+    <value>บันทึก</value>
   </data>
   <!-- Settings window -->
   <data name="SettingsTitle" xml:space="preserve">
-    <value>เธ•เธฑเนเธเธเนเธฒ</value>
+    <value>ตั้งค่า</value>
   </data>
   <data name="ClientExecutable" xml:space="preserve">
-    <value>เนเธเธฅเนเนเธเธฃเนเธเธฃเธก Camfrog</value>
+    <value>ไฟล์โปรแกรม Camfrog</value>
   </data>
   <data name="Browse" xml:space="preserve">
-    <value>เน€เธฃเธตเธขเธเธ”เธน...</value>
+    <value>เรียกดู...</value>
   </data>
   <data name="ArgsTemplate" xml:space="preserve">
-    <value>เน€เธ—เธกเน€เธเธฅเธ•เธญเธฒเธฃเนเธเธดเธงเน€เธกเธเธ•เน (เนเธกเนเธเธฑเธเธเธฑเธ)</value>
+    <value>เทมเพลตอาร์กิวเมนต์ (ไม่บังคับ)</value>
   </data>
   <data name="ArgsHint" xml:space="preserve">
-    <value>เธ•เธฑเธงเนเธ—เธเธ—เธตเนเธฃเธญเธเธฃเธฑเธ: {username}, {profile} เน€เธงเนเธเธงเนเธฒเธเนเธงเน เน€เธงเนเธเนเธ•เนเนเธเธฅเน€เธญเธเธ•เนเธเธญเธเธเธธเธ“เธฃเธฐเธเธธเนเธงเนเน€เธเนเธเธญเธขเนเธฒเธเธญเธทเนเธ เนเธกเนเธกเธตเธเธฒเธฃเธชเนเธเธฃเธซเธฑเธชเธเนเธฒเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด</value>
+    <value>ตัวแทนที่รองรับ: {username}, {profile} เว้นว่างไว้ เว้นแต่ไคลเอนต์ของคุณระบุไว้เป็นอย่างอื่น ไม่มีการส่งรหัสผ่านอัตโนมัติ</value>
   </data>
   <data name="SandboxLabel" xml:space="preserve">
-    <value>เธฃเธฑเธเนเธ•เนเธฅเธฐเธเธฑเธเธเธตเนเธ Sandboxie box เธเธญเธเธ•เธฑเธงเน€เธญเธ (เธฃเธฑเธเธเธฃเนเธญเธกเธเธฑเธเนเธ”เน)</value>
+    <value>รันแต่ละบัญชีใน Sandboxie box ของตัวเอง (รันพร้อมกันได้)</value>
   </data>
   <data name="SandboxExeLabel" xml:space="preserve">
-    <value>Sandboxie Start.exe (เธงเนเธฒเธ = เธเนเธเธซเธฒเธญเธฑเธ•เนเธเธกเธฑเธ•เธด)</value>
+    <value>Sandboxie Start.exe (ว่าง = ค้นหาอัตโนมัติ)</value>
   </data>
   <data name="DownloadSandboxie" xml:space="preserve">
-    <value>เธ”เธฒเธงเธเนเนเธซเธฅเธ” Sandboxie-Plus</value>
+    <value>ดาวน์โหลด Sandboxie-Plus</value>
   </data>
   <data name="CreateBoxes" xml:space="preserve">
-    <value>เธชเธฃเนเธฒเธ Box เนเธซเนเธ—เธธเธเธเธฑเธเธเธต</value>
+    <value>สร้าง Box ให้ทุกบัญชี</value>
   </data>
   <data name="AutoBackupEvery" xml:space="preserve">
-    <value>เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅเธ—เธธเธ</value>
+    <value>สำรองข้อมูลทุก</value>
   </data>
   <data name="DaysOffHint" xml:space="preserve">
-    <value>เธงเธฑเธ (0 = เธเธดเธ”) เน€เธเนเธ</value>
+    <value>วัน (0 = ปิด) เก็บ</value>
   </data>
   <data name="Files" xml:space="preserve">
-    <value>เนเธเธฅเน</value>
+    <value>ไฟล์</value>
   </data>
   <data name="OpenDataFolder" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเธฅเน€เธ”เธญเธฃเนเธเนเธญเธกเธนเธฅ</value>
+    <value>เปิดโฟลเดอร์ข้อมูล</value>
   </data>
   <data name="BackupData" xml:space="preserve">
-    <value>เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅ...</value>
+    <value>สำรองข้อมูล...</value>
   </data>
   <data name="RestoreData" xml:space="preserve">
-    <value>เธเธนเนเธเธทเธเธเนเธญเธกเธนเธฅ...</value>
+    <value>กู้คืนข้อมูล...</value>
   </data>
   <data name="Language" xml:space="preserve">
-    <value>เธ เธฒเธฉเธฒ (เธฃเธตเธชเธ•เธฒเธฃเนเธ—เน€เธเธทเนเธญเนเธเนเธ—เธฑเนเธเธซเธกเธ”)</value>
+    <value>ภาษา (รีสตาร์ทเพื่อใช้ทั้งหมด)</value>
   </data>
   <!-- Change password window -->
   <data name="ChangePasswordTitle" xml:space="preserve">
-    <value>เน€เธเธฅเธตเนเธขเธเธฃเธซเธฑเธชเธเนเธฒเธ</value>
+    <value>เปลี่ยนรหัสผ่าน</value>
   </data>
   <data name="NewPassword" xml:space="preserve">
-    <value>เธฃเธซเธฑเธชเธเนเธฒเธเนเธซเธกเน</value>
+    <value>รหัสผ่านใหม่</value>
   </data>
   <data name="ChangePasswordHint" xml:space="preserve">
-    <value>เนเธ—เธเธ—เธตเนเธเธงเธฒเธกเธฅเธฑเธเธ—เธตเนเธเนเธญเธเธเธฑเธเธ”เนเธงเธข DPAPI เธฃเธซเธฑเธชเธเนเธฒเธเน€เธ”เธดเธกเธเธนเนเธเธทเธเนเธกเนเนเธ”เน</value>
+    <value>แทนที่ความลับที่ป้องกันด้วย DPAPI รหัสผ่านเดิมกู้คืนไม่ได้</value>
   </data>
   <!-- Messages ({0} placeholders) -->
   <data name="MsgSelectAccount" xml:space="preserve">
-    <value>เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธเธฑเธเธเธตเธเนเธญเธ</value>
+    <value>กรุณาเลือกบัญชีก่อน</value>
   </data>
   <data name="TitleEditAccount" xml:space="preserve">
-    <value>เนเธเนเนเธเธเธฑเธเธเธต</value>
+    <value>แก้ไขบัญชี</value>
   </data>
   <data name="TitleDeleteAccount" xml:space="preserve">
-    <value>เธฅเธเธเธฑเธเธเธต</value>
+    <value>ลบบัญชี</value>
   </data>
   <data name="TitleEnableDisable" xml:space="preserve">
-    <value>เน€เธเธดเธ”/เธเธดเธ”เนเธเน</value>
+    <value>เปิด/ปิดใช้</value>
   </data>
   <data name="TitleStartAccount" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธเธฑเธเธเธต</value>
+    <value>เริ่มบัญชี</value>
   </data>
   <data name="TitleStopAccount" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธเธฑเธเธเธต</value>
+    <value>หยุดบัญชี</value>
   </data>
   <data name="TitleStartAll" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธ—เธฑเนเธเธซเธกเธ”</value>
+    <value>เริ่มทั้งหมด</value>
   </data>
   <data name="TitleStopAll" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธ—เธฑเนเธเธซเธกเธ”</value>
+    <value>หยุดทั้งหมด</value>
   </data>
   <data name="TitleClearError" xml:space="preserve">
-    <value>เธฅเนเธฒเธเธเนเธญเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>ล้างข้อผิดพลาด</value>
   </data>
   <data name="TitleChangePassword" xml:space="preserve">
-    <value>เน€เธเธฅเธตเนเธขเธเธฃเธซเธฑเธชเธเนเธฒเธ</value>
+    <value>เปลี่ยนรหัสผ่าน</value>
   </data>
   <data name="TitleValidation" xml:space="preserve">
-    <value>เธ•เธฃเธงเธเธชเธญเธเธเนเธญเธกเธนเธฅ</value>
+    <value>ตรวจสอบข้อมูล</value>
   </data>
   <data name="TitleSaveError" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>บันทึกผิดพลาด</value>
   </data>
   <data name="TitleStartError" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>เริ่มผิดพลาด</value>
   </data>
   <data name="TitleStopError" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>หยุดผิดพลาด</value>
   </data>
   <data name="TitleUpdateError" xml:space="preserve">
-    <value>เธญเธฑเธเน€เธ”เธ•เธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>อัปเดตผิดพลาด</value>
   </data>
   <data name="TitleDeleteError" xml:space="preserve">
-    <value>เธฅเธเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>ลบผิดพลาด</value>
   </data>
   <data name="MsgEnterDisplayName" xml:space="preserve">
-    <value>เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธทเนเธญเนเธชเธ”เธ</value>
+    <value>กรุณากรอกชื่อแสดง</value>
   </data>
   <data name="MsgDisplayNameTooLong" xml:space="preserve">
-    <value>เธเธทเนเธญเนเธชเธ”เธเธขเธฒเธงเน€เธเธดเธเนเธ (เธชเธนเธเธชเธธเธ” 80 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ)</value>
+    <value>ชื่อแสดงยาวเกินไป (สูงสุด 80 ตัวอักษร)</value>
   </data>
   <data name="MsgEnterUsername" xml:space="preserve">
-    <value>เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธทเนเธญเธเธนเนเนเธเน</value>
+    <value>กรุณากรอกชื่อผู้ใช้</value>
   </data>
   <data name="MsgUsernameTooLong" xml:space="preserve">
-    <value>เธเธทเนเธญเธเธนเนเนเธเนเธขเธฒเธงเน€เธเธดเธเนเธ (เธชเธนเธเธชเธธเธ” 80 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ)</value>
+    <value>ชื่อผู้ใช้ยาวเกินไป (สูงสุด 80 ตัวอักษร)</value>
   </data>
   <data name="MsgEnterPassword" xml:space="preserve">
-    <value>เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเนเธฒเธ</value>
+    <value>กรุณากรอกรหัสผ่าน</value>
   </data>
   <data name="MsgDuplicateAccount" xml:space="preserve">
-    <value>เธกเธตเธเธฑเธเธเธตเธเธทเนเธญเธเธนเนเนเธเนเธเธตเนเธญเธขเธนเนเนเธฅเนเธง</value>
+    <value>มีบัญชีชื่อผู้ใช้นี้อยู่แล้ว</value>
   </data>
   <data name="TitleDuplicateAccount" xml:space="preserve">
-    <value>เธเธฑเธเธเธตเธเนเธณ</value>
+    <value>บัญชีซ้ำ</value>
   </data>
   <data name="MsgSaveAccountFailed" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธเธเธฑเธเธเธตเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>บันทึกบัญชีไม่ได้{0}{0}{1}</value>
   </data>
   <data name="MsgAccountGone" xml:space="preserve">
-    <value>เธเธฑเธเธเธตเธ—เธตเนเน€เธฅเธทเธญเธเนเธกเนเธกเธตเธญเธขเธนเนเนเธฅเนเธง</value>
+    <value>บัญชีที่เลือกไม่มีอยู่แล้ว</value>
   </data>
   <data name="MsgConfirmDelete" xml:space="preserve">
     <value>ลบบัญชี '{1}' ({2})?{0}{0}การดำเนินการนี้จะลบแถวฐานข้อมูล ความลับ DPAPI และโฟลเดอร์โปรไฟล์ ไม่สามารถย้อนกลับได้</value>
   </data>
   <data name="TitleConfirmDelete" xml:space="preserve">
-    <value>เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธ</value>
+    <value>ยืนยันการลบ</value>
   </data>
   <data name="MsgDeleteFailed" xml:space="preserve">
-    <value>เธฅเธ '{0}' เนเธกเนเนเธ”เน{1}{1}{2}</value>
+    <value>ลบ '{0}' ไม่ได้{1}{1}{2}</value>
   </data>
   <data name="MsgNoEnabledAccounts" xml:space="preserve">
-    <value>เนเธกเนเธกเธตเธเธฑเธเธเธตเธ—เธตเนเน€เธเธดเธ”เนเธเนเนเธซเนเน€เธฃเธดเนเธก</value>
+    <value>ไม่มีบัญชีที่เปิดใช้ให้เริ่ม</value>
   </data>
   <data name="MsgConfirmStartAll" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธกเธเธฑเธเธเธต {0} เธเธฑเธเธเธต?{1}{1}เนเธเธฃเธ”เธ•เธฃเธงเธเธชเธญเธเธเธฒเธฃเธฃเธฑเธเนเธขเธเธเธฑเธเธเธตเธเนเธญเธ เนเธเธฅเน€เธญเธเธ•เนเธญเธฒเธเนเธกเนเธชเธเนเธเธเธฒเธฃเนเธขเธ {{profile}}</value>
+    <value>เริ่มบัญชี {0} บัญชี?{1}{1}โปรดตรวจสอบการรันแยกบัญชีก่อน ไคลเอนต์อาจไม่สนใจการแยก {{profile}}</value>
   </data>
   <data name="MsgConfirmStopAll" xml:space="preserve">
-    <value>เธซเธขเธธเธ”เธเธฑเธเธเธตเธ—เธฑเนเธเธซเธกเธ” {0} เธเธฑเธเธเธต?</value>
+    <value>หยุดบัญชีทั้งหมด {0} บัญชี?</value>
   </data>
   <data name="MsgStartFailed" xml:space="preserve">
-    <value>เน€เธฃเธดเนเธก '{0}' เนเธกเนเนเธ”เน{1}{1}{2}</value>
+    <value>เริ่ม '{0}' ไม่ได้{1}{1}{2}</value>
   </data>
   <data name="MsgStopFailed" xml:space="preserve">
-    <value>เธซเธขเธธเธ” '{0}' เนเธกเนเนเธ”เน{1}{1}{2}</value>
+    <value>หยุด '{0}' ไม่ได้{1}{1}{2}</value>
   </data>
   <data name="MsgUpdateFailed" xml:space="preserve">
-    <value>เธญเธฑเธเน€เธ”เธ• '{0}' เนเธกเนเนเธ”เน{1}{1}{2}</value>
+    <value>อัปเดต '{0}' ไม่ได้{1}{1}{2}</value>
   </data>
   <data name="MsgPasswordUpdated" xml:space="preserve">
-    <value>เธญเธฑเธเน€เธ”เธ•เธฃเธซเธฑเธชเธเนเธฒเธเนเธฅเนเธง (เธเนเธญเธเธเธฑเธเธ”เนเธงเธข DPAPI)</value>
+    <value>อัปเดตรหัสผ่านแล้ว (ป้องกันด้วย DPAPI)</value>
   </data>
   <data name="MsgEnterNewPassword" xml:space="preserve">
-    <value>เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเนเธฒเธเนเธซเธกเน</value>
+    <value>กรุณากรอกรหัสผ่านใหม่</value>
   </data>
   <data name="MsgPasswordUpdateFailed" xml:space="preserve">
-    <value>เธญเธฑเธเน€เธ”เธ•เธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>อัปเดตรหัสผ่านไม่ได้{0}{0}{1}</value>
   </data>
   <data name="MsgExeNotFound" xml:space="preserve">
-    <value>เนเธกเนเธเธเนเธเธฅเนเนเธเธฃเนเธเธฃเธกเธ—เธตเนเน€เธฅเธทเธญเธ</value>
+    <value>ไม่พบไฟล์โปรแกรมที่เลือก</value>
   </data>
   <data name="MsgSettingsSaved" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธเธเธฒเธฃเธ•เธฑเนเธเธเนเธฒเนเธฅเนเธง</value>
+    <value>บันทึกการตั้งค่าแล้ว</value>
   </data>
   <data name="MsgInvalidRoomUrl" xml:space="preserve">
-    <value>URL เธซเนเธญเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ{0}{0}{1}</value>
+    <value>URL ห้องไม่ถูกต้อง{0}{0}{1}</value>
   </data>
   <data name="MsgTemplateWarning" xml:space="preserve">
-    <value>เน€เธ—เธกเน€เธเธฅเธ•เธญเธฒเธฃเนเธเธดเธงเน€เธกเธเธ•เนเธกเธตเธเธณเน€เธ•เธทเธญเธ:{0}{0}{1}{0}{0}เธเธฑเธเธ—เธถเธเธญเธขเธนเนเธซเธฃเธทเธญเนเธกเน?</value>
+    <value>เทมเพลตอาร์กิวเมนต์มีคำเตือน:{0}{0}{1}{0}{0}บันทึกอยู่หรือไม่?</value>
   </data>
   <data name="TitleTemplateWarning" xml:space="preserve">
-    <value>เธเธณเน€เธ•เธทเธญเธเน€เธ—เธกเน€เธเธฅเธ•</value>
+    <value>คำเตือนเทมเพลต</value>
   </data>
   <data name="MsgSandboxieMissing" xml:space="preserve">
-    <value>เน€เธเธดเธ” Sandboxie เนเธ•เนเนเธกเนเธเธ Start.exe เธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เธฑเนเธ Sandboxie-Plus เธซเธฃเธทเธญเธฃเธฐเธเธธเธเธฒเธ</value>
+    <value>เปิด Sandboxie แต่ไม่พบ Start.exe กรุณาติดตั้ง Sandboxie-Plus หรือระบุพาธ</value>
   </data>
   <data name="MsgOpenFolderFailed" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเธฅเน€เธ”เธญเธฃเนเธเนเธญเธกเธนเธฅเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>เปิดโฟลเดอร์ข้อมูลไม่ได้{0}{0}{1}</value>
   </data>
   <data name="TitleOpenFolder" xml:space="preserve">
-    <value>เน€เธเธดเธ”เนเธเธฅเน€เธ”เธญเธฃเน</value>
+    <value>เปิดโฟลเดอร์</value>
   </data>
   <data name="MsgBackupFailed" xml:space="preserve">
-    <value>เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>สำรองข้อมูลไม่ได้{0}{0}{1}</value>
   </data>
   <data name="TitleBackup" xml:space="preserve">
-    <value>เธชเธณเธฃเธญเธเธเนเธญเธกเธนเธฅ</value>
+    <value>สำรองข้อมูล</value>
   </data>
   <data name="TitleBackupError" xml:space="preserve">
-    <value>เธชเธณเธฃเธญเธเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>สำรองผิดพลาด</value>
   </data>
   <data name="MsgRestoreFailed" xml:space="preserve">
-    <value>เธเธนเนเธเธทเธเธเนเธญเธกเธนเธฅเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>กู้คืนข้อมูลไม่ได้{0}{0}{1}</value>
   </data>
   <data name="TitleRestore" xml:space="preserve">
-    <value>เธเธนเนเธเธทเธเธเนเธญเธกเธนเธฅ</value>
+    <value>กู้คืนข้อมูล</value>
   </data>
   <data name="TitleRestoreError" xml:space="preserve">
-    <value>เธเธนเนเธเธทเธเธเธดเธ”เธเธฅเธฒเธ”</value>
+    <value>กู้คืนผิดพลาด</value>
   </data>
   <data name="MsgConfirmRestore" xml:space="preserve">
-    <value>เธเธฒเธฃเธเธนเนเธเธทเธเธเธฐเนเธ—เธเธ—เธตเนเธเธฒเธเธเนเธญเธกเธนเธฅ เธเธงเธฒเธกเธฅเธฑเธ เนเธฅเธฐเธเธฒเธฃเธ•เธฑเนเธเธเนเธฒเธเธฑเธเธเธธเธเธฑเธ เธเธฃเธธเธ“เธฒเธซเธขเธธเธ”เนเธเธฅเน€เธญเธเธ•เนเธ—เธฑเนเธเธซเธกเธ”เธเนเธญเธ{0}{0}เธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญ?</value>
+    <value>การกู้คืนจะแทนที่ฐานข้อมูล ความลับ และการตั้งค่าปัจจุบัน กรุณาหยุดไคลเอนต์ทั้งหมดก่อน{0}{0}ดำเนินการต่อ?</value>
   </data>
   <data name="TitleConfirmRestore" xml:space="preserve">
-    <value>เธขเธทเธเธขเธฑเธเธเธฒเธฃเธเธนเนเธเธทเธ</value>
+    <value>ยืนยันการกู้คืน</value>
   </data>
   <data name="MsgNoLogFile" xml:space="preserve">
-    <value>เธขเธฑเธเนเธกเนเธกเธตเนเธเธฅเนเธเธฑเธเธ—เธถเธ</value>
+    <value>ยังไม่มีไฟล์บันทึก</value>
   </data>
   <data name="TitleLogs" xml:space="preserve">
-    <value>เธเธฑเธเธ—เธถเธ</value>
+    <value>บันทึก</value>
   </data>
   <data name="MsgExportLogFailed" xml:space="preserve">
-    <value>เธชเนเธเธญเธญเธเธเธฑเธเธ—เธถเธเนเธกเนเนเธ”เน{0}{0}{1}</value>
+    <value>ส่งออกบันทึกไม่ได้{0}{0}{1}</value>
   </data>
   <data name="MsgRestartRequired" xml:space="preserve">
-    <value>เธ เธฒเธฉเธฒเธเธฐเธกเธตเธเธฅเธ—เธฑเนเธเธซเธกเธ”เธซเธฅเธฑเธเธฃเธตเธชเธ•เธฒเธฃเนเธ—เนเธเธฃเนเธเธฃเธก</value>
+    <value>ภาษาจะมีผลทั้งหมดหลังรีสตาร์ทโปรแกรม</value>
   </data>
   <data name="TitleLanguage" xml:space="preserve">
     <value>เธ เธฒเธฉเธฒ</value>
   </data>
   <data name="MsgBackupDaysInvalid" xml:space="preserve">
-    <value>เธเนเธงเธเธชเธณเธฃเธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธ•เนเธญเธเน€เธเนเธเธ•เธฑเธงเน€เธฅเธ 0 เธ–เธถเธ 365 (0 = เธเธดเธ”)</value>
+    <value>ช่วงสำรองอัตโนมัติต้องเป็นตัวเลข 0 ถึง 365 (0 = ปิด)</value>
   </data>
   <data name="MsgBackupKeepInvalid" xml:space="preserve">
-    <value>เธเธณเธเธงเธเนเธเธฅเนเธ—เธตเนเน€เธเนเธเธ•เนเธญเธเน€เธเนเธเธ•เธฑเธงเน€เธฅเธ 1 เธ–เธถเธ 100</value>
+    <value>จำนวนไฟล์ที่เก็บต้องเป็นตัวเลข 1 ถึง 100</value>
   </data>
   <data name="ExeStatusNone" xml:space="preserve">
     <value>ยังไม่ได้ตั้งค่าไฟล์โปรแกรม ไม่สามารถเริ่มบัญชีได้จนกว่าจะตั้งค่า</value>
@@ -478,5 +478,35 @@
   </data>
   <data name="TitleConfirmStopAll" xml:space="preserve">
     <value>ยืนยันหยุดทั้งหมด</value>
+  </data>
+  <data name="TitleForeignClient" xml:space="preserve">
+    <value>มีไคลเอนต์อื่นรันอยู่</value>
+  </data>
+  <data name="MsgForeignClient" xml:space="preserve">
+    <value>มีไคลเอนต์ Camfrog อื่นรันอยู่นอกตัวจัดการ (PID {0}){1}{1}การเริ่มใหม่อาจออกทันที เพราะไคลเอนต์รันได้ทีละตัว กรุณาปิดตัวนั้นก่อน (ดูที่ system tray — การปิดหน้าต่างอาจแค่ย่อไว้){1}{1}ยังจะเริ่มอยู่หรือไม่?</value>
+  </data>
+  <data name="AutoStartAccounts" xml:space="preserve">
+    <value>เริ่มบัญชีที่เปิดใช้เมื่อเปิดโปรแกรม</value>
+  </data>
+  <data name="BoxesNone" xml:space="preserve">
+    <value>ไม่มีบัญชีให้สร้าง Box</value>
+  </data>
+  <data name="BoxesElevationHint" xml:space="preserve">
+    <value>เคล็ดลับ: การสร้าง Box ต้องเขียนค่า Sandboxie ซึ่งต้องใช้สิทธิ์ผู้ดูแล รันตัวจัดการแบบผู้ดูแล หรือสร้าง Box ใน SandMan (แบบผู้ดูแล)</value>
+  </data>
+  <data name="DashboardTitle" xml:space="preserve">
+    <value>แดชบอร์ดสุขภาพ</value>
+  </data>
+  <data name="DashboardRunning" xml:space="preserve">
+    <value>รัน {0} (PID {1}, ต่อเนื่อง {2})</value>
+  </data>
+  <data name="DashboardErrorAcct" xml:space="preserve">
+    <value>ผิดพลาด {0}: {1}</value>
+  </data>
+  <data name="CreateBoxesAdmin" xml:space="preserve">
+    <value>สร้าง Box (แอดมิน...)</value>
+  </data>
+  <data name="MsgAdminLaunchFailed" xml:space="preserve">
+    <value>เปิดตัวช่วยแบบยกระดับไม่ได้{0}{0}{1}</value>
   </data>
 </root>

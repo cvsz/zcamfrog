@@ -398,6 +398,26 @@ public sealed class DatabaseService
         }
     }
 
+    public sealed record EventEntry(long Id, string Utc, string Level, string Message);
+
+    public IReadOnlyList<EventEntry> GetRecentEvents(int limit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+        var capped = Math.Min(limit, 500);
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT id,utc,level,message FROM events ORDER BY id DESC LIMIT $n;";
+            command.Parameters.AddWithValue("$n", capped);
+            using var reader = command.ExecuteReader();
+            var result = new List<EventEntry>();
+            while (reader.Read())
+                result.Add(new EventEntry(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            return result;
+        }
+    }
+
     public void Log(string level, string message)
     {
         lock (_gate)
@@ -600,18 +620,32 @@ public sealed class ProcessSessionService
         ProcessStartInfo psi;
         if (settings.UseSandboxie)
         {
-            var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
+            var configured = string.IsNullOrWhiteSpace(settings.SandboxieStartExe)
                 ? FindSandboxieStart()
-                : Path.GetFullPath(settings.SandboxieStartExe);
-            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
-                throw new FileNotFoundException("Sandboxie Start.exe was not found. Install Sandboxie-Plus or configure its path in Settings.", startExe ?? string.Empty);
+                : settings.SandboxieStartExe;
+            if (!IsSandboxieReady(configured, out var reason))
+                throw new InvalidOperationException($"Sandboxie is not ready: {reason}");
+            var startExe = Path.GetFullPath(configured!);
             trackedExecutable = startExe;
+            // Start.exe rejects unknown boxes ("Invalid box name parameter",
+            // Sbie message 3204), so ensure the box exists first. Creation is
+            // idempotent: an existing box is left untouched.
+            try
+            {
+                CreateBox(startExe, SanitizeBoxName(account));
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception)
+            {
+                throw new InvalidOperationException(
+                    $"Could not ensure Sandboxie box '{SanitizeBoxName(account)}'. " +
+                    "Create it via Settings, or verify the Sandboxie service is running.", ex);
+            }
             psi = new ProcessStartInfo
             {
                 FileName = startExe,
                 // /wait keeps Start.exe alive while the sandboxed client runs, so the
                 // tracked PID stays valid for the whole session.
-                Arguments = $"/wait /Box:{Quote(SanitizeBoxName(account))} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
+                Arguments = $"/wait /Box:{SanitizeBoxName(account)} {Quote(executable)}{(string.IsNullOrWhiteSpace(args) ? string.Empty : " " + args)}",
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory
             };
@@ -683,6 +717,11 @@ public sealed class ProcessSessionService
             if (!process.HasExited)
             {
                 try { process.CloseMainWindow(); } catch (InvalidOperationException) { }
+
+                // Killing Start.exe does not stop a sandbox: Sandboxie keeps
+                // box contents alive. Terminate the whole box instead.
+                if (IsSandboxedExecutable(account.ProcessExecutablePath))
+                    TerminateBox(account.ProcessExecutablePath, SanitizeBoxName(account));
 
                 if (!process.HasExited && !process.WaitForExit(5000))
                     process.Kill(entireProcessTree: true);
@@ -807,7 +846,9 @@ public sealed class ProcessSessionService
         if (!settings.UseSandboxie)
             return inner;
         var startExe = string.IsNullOrWhiteSpace(settings.SandboxieStartExe) ? FindSandboxieStart() ?? "<Start.exe>" : settings.SandboxieStartExe;
-        return $"\"{startExe}\" /wait /Box:{Quote(SanitizeBoxName(account))} {inner}";
+        // Box names are sanitized to letters/digits only, so no quoting is
+        // needed (and Sandboxie's parser rejects quoted names).
+        return $"\"{startExe}\" /wait /Box:{SanitizeBoxName(account)} {inner}";
     }
 
     public static string NormalizeRoomUrl(string roomUrl)
@@ -823,13 +864,79 @@ public sealed class ProcessSessionService
 
     public static string SanitizeBoxName(CamfrogAccount account)
     {
+        // Matches the Sandboxie engine rule (start.cpp Parse_Command_Line):
+        // letters, digits, and underscore only, max 32 chars. Underscores
+        // are preserved so box names stay recognizable next to nicknames
+        // such as "_oIo_".
         ArgumentNullException.ThrowIfNull(account);
-        var base_name = new string(account.Username.Where(char.IsLetterOrDigit).ToArray());
+        var base_name = new string(account.Username.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
         if (base_name.Length > 32)
             base_name = base_name.Substring(0, 32);
         if (string.IsNullOrEmpty(base_name))
             base_name = "account" + account.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return base_name;
+    }
+
+    public sealed record ForeignProcess(int ProcessId, string ExecutablePath, DateTime StartTimeUtc);
+
+    /// <summary>
+    /// Finds client processes that the manager does not track (e.g. a copy
+    /// the user started by hand). A second launch while one of these lives
+    /// typically hands off and exits within seconds because the Camfrog
+    /// client is single-instance per session. Warning-only: the caller
+    /// decides; never kills anything here.
+    /// </summary>
+    public static IReadOnlyList<ForeignProcess> FindForeignClientProcesses(string executablePath, int? excludePid = null)
+    {
+        var result = new List<ForeignProcess>();
+        if (string.IsNullOrWhiteSpace(executablePath))
+            return result;
+        string processName;
+        string expectedFullPath;
+        try
+        {
+            expectedFullPath = Path.GetFullPath(executablePath);
+            processName = Path.GetFileNameWithoutExtension(expectedFullPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return result;
+        }
+        if (string.IsNullOrWhiteSpace(processName))
+            return result;
+
+        Process[] candidates;
+        try { candidates = Process.GetProcessesByName(processName); }
+        catch (InvalidOperationException) { return result; }
+
+        foreach (var candidate in candidates)
+        {
+            using (candidate)
+            {
+                try
+                {
+                    if (candidate.HasExited)
+                        continue;
+                    if (excludePid is int excluded && candidate.Id == excluded)
+                        continue;
+                    string actualPath;
+                    try { actualPath = candidate.MainModule?.FileName ?? string.Empty; }
+                    catch (InvalidOperationException) { continue; }
+                    catch (System.ComponentModel.Win32Exception) { continue; }
+                    if (!string.IsNullOrWhiteSpace(actualPath) &&
+                        !string.Equals(Path.GetFullPath(actualPath), expectedFullPath, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    DateTime started;
+                    try { started = candidate.StartTime.ToUniversalTime(); }
+                    catch (InvalidOperationException) { continue; }
+                    catch (System.ComponentModel.Win32Exception) { continue; }
+                    result.Add(new ForeignProcess(candidate.Id, actualPath, started));
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            }
+        }
+        return result;
     }
 
     public static string? FindSandboxieStart()
@@ -850,6 +957,93 @@ public sealed class ProcessSessionService
 
     public const string SandboxieReleasesUrl = "https://github.com/sandboxie-plus/Sandboxie/releases";
     public const string SandboxieRepository = "https://github.com/sandboxie-plus/Sandboxie";
+
+    /// <summary>
+    /// Verifies Sandboxie can actually run boxes: Start.exe must exist and
+    /// the SbieSvc service must be installed and running (a bare file copy
+    /// without driver/service install fails every launch).
+    /// </summary>
+    public static bool IsSandboxieReady(string? configuredStartExe, out string? reason)
+    {
+        reason = null;
+        var startExe = string.IsNullOrWhiteSpace(configuredStartExe) ? FindSandboxieStart() : configuredStartExe;
+        if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+        {
+            reason = "Start.exe was not found.";
+            return false;
+        }
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\SbieSvc");
+            if (key is null)
+            {
+                reason = "The SbieSvc service is not installed. Run the Sandboxie-Plus installer (as admin) first.";
+                return false;
+            }
+        }
+        catch (System.Security.SecurityException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+        catch (IOException)
+        {
+            reason = "Cannot read service status.";
+            return false;
+        }
+
+        if (!IsServiceRunning("SbieSvc"))
+        {
+            reason = "The SbieSvc service is installed but not running. Start it from services.msc (as admin).";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool IsServiceRunning(string serviceName)
+    {
+        try
+        {
+            using var service = new System.ServiceProcess.ServiceController(serviceName);
+            return service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+        }
+        catch (InvalidOperationException) { return false; }
+        catch (System.ComponentModel.Win32Exception) { return false; }
+    }
+
+    /// <summary>
+    /// Best-effort start of the Sandboxie service (requires elevation;
+    /// fails gracefully with a reason otherwise).
+    /// </summary>
+    public static bool TryStartSandboxieService(out string? reason)
+    {
+        reason = null;
+        try
+        {
+            using var service = new System.ServiceProcess.ServiceController("SbieSvc");
+            try { var _ = service.Status; }
+            catch (InvalidOperationException)
+            {
+                reason = "The SbieSvc service is not installed. Run the Sandboxie-Plus installer (as admin) first.";
+                return false;
+            }
+            if (service.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                return true;
+            service.Start();
+            service.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+            return service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or System.ServiceProcess.TimeoutException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            reason = $"Could not start the SbieSvc service ({ex.Message}). Run the manager as admin, or start it from services.msc.";
+            return false;
+        }
+    }
 
     public static string? GetSandboxieVersion(string? startExePath)
     {
@@ -888,8 +1082,107 @@ public sealed class ProcessSessionService
         catch (UnauthorizedAccessException) { return false; }
     }
 
-    public static string BuildCreateBoxArguments(string boxName) =>
-        $"/Box:{Quote(boxName)} \"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")}\" /c exit";
+    public static string FindSbieIni(string startExe)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        var dir = Path.GetDirectoryName(Path.GetFullPath(startExe));
+        return string.IsNullOrWhiteSpace(dir) ? "SbieIni.exe" : Path.Combine(dir, "SbieIni.exe");
+    }
+
+    /// <summary>
+    /// Arguments that persistently create a box via the config tool.
+    /// Proven over Start.exe probing: only a config write makes
+    /// SbieApi_IsBoxEnabled succeed; a bare Start into an unknown box
+    /// exits without creating anything.
+    /// </summary>
+    public static string BuildSbieIniSetArguments(string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        return $"set {boxName.Trim()} Enabled y";
+    }
+
+    public static string BuildTerminateArguments(string boxName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
+        return $"/Box:{boxName.Trim()} /terminate";
+    }
+
+    /// <summary>
+    /// Best-effort termination of everything inside a Sandboxie box.
+    /// Never throws: callers fall back to process-tree kill.
+    /// </summary>
+    public static void TerminateBox(string startExe, string boxName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+                return;
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = startExe,
+                Arguments = BuildTerminateArguments(boxName),
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit(15000);
+        }
+        catch (InvalidOperationException) { }
+        catch (System.ComponentModel.Win32Exception) { }
+        catch (FileNotFoundException) { }
+    }
+
+    public static bool IsSandboxedExecutable(string? executablePath) =>
+        string.Equals(
+            Path.GetFileName(executablePath ?? string.Empty),
+            "Start.exe",
+            StringComparison.OrdinalIgnoreCase);
+
+
+
+    /// <summary>
+    /// Builds an elevated launcher that creates every box (box creation
+    /// writes the Sandboxie configuration, which needs admin). The caller
+    /// starts it with the "runas" verb, which raises the UAC prompt.
+    /// Pure function for testability; performs no elevation itself.
+    /// </summary>
+    public static (string FileName, string Arguments) BuildElevatedCreateBoxesCommand(
+        string startExe, IReadOnlyList<string> boxNames)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(startExe);
+        ArgumentNullException.ThrowIfNull(boxNames);
+        if (boxNames.Count == 0)
+            throw new ArgumentException("At least one box name is required.", nameof(boxNames));
+        var distinct = boxNames
+            .Where(b => !string.IsNullOrWhiteSpace(b))
+            .Select(b => b.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (distinct.Count == 0)
+            throw new ArgumentException("At least one box name is required.", nameof(boxNames));
+
+        var sbieIni = FindSbieIni(Path.GetFullPath(startExe));
+        var script = string.Join("; ", distinct.Select(box =>
+            $"& '{sbieIni.Replace("'", "''", StringComparison.Ordinal)}' set {box} Enabled y")) +
+            "; exit $LASTEXITCODE";
+        // -EncodedCommand avoids all nested-quoting hazards.
+        var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+        return ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}");
+    }
+
+    public static int CreateBoxesElevated(string startExe, IReadOnlyList<string> boxNames)
+    {
+        var (fileName, arguments) = BuildElevatedCreateBoxesCommand(startExe, boxNames);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            UseShellExecute = true,
+            Verb = "runas",
+            WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System)
+        }) ?? throw new InvalidOperationException("Could not launch the elevated helper (UAC prompt declined or failed).");
+        process.WaitForExit();
+        return process.ExitCode;
+    }
 
     public static void CreateBox(string startExe, string boxName)
     {
@@ -897,18 +1190,22 @@ public sealed class ProcessSessionService
         ArgumentException.ThrowIfNullOrWhiteSpace(boxName);
         if (!File.Exists(startExe))
             throw new FileNotFoundException("Sandboxie Start.exe was not found.", startExe);
+        var sbieIni = FindSbieIni(startExe);
+        if (!File.Exists(sbieIni))
+            throw new FileNotFoundException("Sandboxie SbieIni.exe was not found next to Start.exe.", sbieIni);
+        // SbieIni persists the box section; probing with Start.exe alone
+        // exits without creating anything (verified against start.cpp).
         using var process = Process.Start(new ProcessStartInfo
         {
-            FileName = startExe,
-            Arguments = BuildCreateBoxArguments(boxName),
+            FileName = sbieIni,
+            Arguments = BuildSbieIniSetArguments(boxName),
             UseShellExecute = false,
             CreateNoWindow = true
-        }) ?? throw new InvalidOperationException("Could not start Sandboxie Start.exe.");
-        // cmd /c exit terminates immediately; the box persists afterwards.
+        }) ?? throw new InvalidOperationException("Could not start Sandboxie SbieIni.exe.");
         if (!process.WaitForExit(30000))
             throw new TimeoutException($"Timed out creating Sandboxie box '{boxName}'.");
         if (process.ExitCode != 0)
-            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}.");
+            throw new InvalidOperationException($"Sandboxie box creation failed with exit code {process.ExitCode}. Run as administrator if the configuration is not writable.");
     }
 
     public static IReadOnlyList<string> ValidateArgumentsTemplate(string? template)

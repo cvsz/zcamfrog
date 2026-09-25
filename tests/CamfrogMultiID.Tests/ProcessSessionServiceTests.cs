@@ -129,10 +129,61 @@ public sealed class ProcessSessionServiceTests : IDisposable
     }
 
     [Fact]
+    public void FindForeignClientProcesses_InvalidInput_ReturnsEmpty()
+    {
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(""));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses("   "));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(null!));
+        Assert.Empty(ProcessSessionService.FindForeignClientProcesses(Path.Combine(_tempRoot, "no-such-app-xyz.exe")));
+    }
+
+    [Fact]
+    public void FindForeignClientProcesses_FindsSelfUnlessExcluded()
+    {
+        using var self = Process.GetCurrentProcess();
+        var exe = self.MainModule?.FileName;
+        if (string.IsNullOrWhiteSpace(exe))
+            return;
+        var all = ProcessSessionService.FindForeignClientProcesses(exe, null);
+        Assert.Contains(all, f => f.ProcessId == self.Id);
+        var excluded = ProcessSessionService.FindForeignClientProcesses(exe, self.Id);
+        Assert.DoesNotContain(excluded, f => f.ProcessId == self.Id);
+    }
+
+    [Fact]
     public void Start_MissingExecutable_Throws()
     {
         var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_tempRoot, "p1") };
         var settings = new AppSettings { ClientExecutable = "", ClientArgumentsTemplate = "" };
+        Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
+    }
+
+    [Fact]
+    public void Start_SandboxieWithoutStartExe_Throws()
+    {
+        var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_tempRoot, "p_sbx") };
+        var settings = new AppSettings
+        {
+            ClientExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
+            UseSandboxie = true,
+            SandboxieStartExe = Path.Combine(_tempRoot, "missing-start.exe")
+        };
+        Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
+    }
+
+    [Fact]
+    public void Start_InvalidRoomUrl_Throws()
+    {
+        var acc = new CamfrogAccount
+        {
+            Id = 1,
+            ProfileDirectory = Path.Combine(_tempRoot, "p_room"),
+            RoomUrl = "https://example.com/not-camfrog"
+        };
+        var settings = new AppSettings
+        {
+            ClientExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe")
+        };
         Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
     }
 

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using CamfrogMultiID.Core;
 using CamfrogMultiID.Infrastructure;
 
@@ -154,9 +155,22 @@ public sealed class AccountManagementTests : IDisposable
     public void SanitizeBoxName_KeepsAlphanumerics()
     {
         var acc = new CamfrogAccount { Id = 7, Username = "User-1_2!" };
-        Assert.Equal("User12", ProcessSessionService.SanitizeBoxName(acc));
+        Assert.Equal("User1_2", ProcessSessionService.SanitizeBoxName(acc));
         var empty = new CamfrogAccount { Id = 7, Username = "---" };
         Assert.Equal("account7", ProcessSessionService.SanitizeBoxName(empty));
+    }
+
+    [Fact]
+    public void SanitizeBoxName_PreservesUnderscores()
+    {
+        // Regression: nicknames like "_oIo_" must keep their underscores
+        // (Sandboxie engine allows them); stripping caused mismatches.
+        var acc = new CamfrogAccount { Id = 9, Username = "   _oIo_    ".Trim() };
+        Assert.Equal("_oIo_", ProcessSessionService.SanitizeBoxName(acc));
+        var longName = new CamfrogAccount { Id = 9, Username = new string('a', 20) + "_tail_end_here" };
+        var sanitized = ProcessSessionService.SanitizeBoxName(longName);
+        Assert.Equal(32, sanitized.Length);
+        Assert.DoesNotContain(" ", sanitized, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -207,12 +221,68 @@ public sealed class AccountManagementTests : IDisposable
         Assert.Null(ProcessSessionService.GetSandboxieVersion(null));
     }
 
+    private static readonly string[] SampleBoxes = ["BoxA", "BoxB", "boxa", "  "];
+    private static readonly string[] NoBoxes = [];
+
     [Fact]
-    public void BuildCreateBoxArguments_QuotesBox()
+    public void BuildElevatedCreateBoxesCommand_EncodesBoxes()
     {
-        var args = ProcessSessionService.BuildCreateBoxArguments("My Box");
-        Assert.Contains("/Box:", args);
-        Assert.Contains("cmd.exe", args);
+        var (file, args) = ProcessSessionService.BuildElevatedCreateBoxesCommand(
+            @"C:\sb\Start.exe", SampleBoxes);
+        Assert.Equal("powershell.exe", file);
+        Assert.Contains("-EncodedCommand", args, StringComparison.Ordinal);
+        var encoded = args.Substring(args.IndexOf("-EncodedCommand", StringComparison.Ordinal) + "-EncodedCommand".Length).Trim();
+        var script = Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+        Assert.Contains("SbieIni.exe", script, StringComparison.Ordinal);
+        Assert.Contains("set BoxA Enabled y", script, StringComparison.Ordinal);
+        Assert.Contains("set BoxB Enabled y", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("runas", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand("", SampleBoxes));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildElevatedCreateBoxesCommand(@"C:\sb\Start.exe", NoBoxes));
+    }
+
+    [Fact]
+    public void BuildTerminateArguments_FormatsTerminate()
+    {
+        Assert.Equal("/Box:MyBox /terminate", ProcessSessionService.BuildTerminateArguments("MyBox"));
+        Assert.Equal("/Box:X /terminate", ProcessSessionService.BuildTerminateArguments("  X  "));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildTerminateArguments("   "));
+    }
+
+    [Fact]
+    public void IsSandboxedExecutable_DetectsStartExe()
+    {
+        Assert.True(ProcessSessionService.IsSandboxedExecutable(@"C:\Program Files\Sandboxie-Plus\Start.exe"));
+        Assert.True(ProcessSessionService.IsSandboxedExecutable("start.EXE"));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(@"C:\Camfrog\Camfrog.exe"));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(""));
+        Assert.False(ProcessSessionService.IsSandboxedExecutable(null));
+    }
+
+    [Fact]
+    public void BuildSbieIniSetArguments_FormatsSetCommand()
+    {
+        Assert.Equal("set MyBox Enabled y", ProcessSessionService.BuildSbieIniSetArguments("MyBox"));
+        Assert.Equal("set X Enabled y", ProcessSessionService.BuildSbieIniSetArguments("  X  "));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.BuildSbieIniSetArguments("   "));
+    }
+
+    [Fact]
+    public void FindSbieIni_SitsNextToStartExe()
+    {
+        Assert.Equal(
+            Path.Combine("C:", "sb", "SbieIni.exe"),
+            ProcessSessionService.FindSbieIni(Path.Combine("C:", "sb", "Start.exe")));
+        Assert.Throws<ArgumentException>(() => ProcessSessionService.FindSbieIni("   "));
+    }
+
+    [Fact]
+    public void PreviewLaunch_ShowsUnquotedBox()
+    {
+        var acc = new CamfrogAccount { Id = 1, Username = "u1", ProfileDirectory = @"C:\p\1" };
+        var cmd = ProcessSessionService.PreviewLaunch(
+            new AppSettings { ClientExecutable = @"C:\c.exe", UseSandboxie = true, SandboxieStartExe = @"C:\sb\Start.exe" }, acc);
+        Assert.Contains("/Box:u1 ", cmd);
     }
 
     [Fact]
@@ -273,6 +343,21 @@ public sealed class AccountManagementTests : IDisposable
         _db.SetPasswordChanged(id, stamp);
         Assert.Equal(stamp, _db.GetById(id)!.PasswordChangedUtc);
         Assert.Throws<InvalidOperationException>(() => _db.SetPasswordChanged(id + 9999, stamp));
+    }
+
+    [Fact]
+    public void RestartPolicy_BudgetSurvivesSuccessfulStarts()
+    {
+        // Regression for the auto-restart loop: the UI resets the budget only
+        // on manual start/stop. Simulates exit -> allow -> start ok, repeated,
+        // with no Reset in between (the automatic path).
+        var policy = new RestartPolicy();
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.True(policy.ShouldRestart(99, now.AddSeconds(i * 2)));
+        }
+        Assert.False(policy.ShouldRestart(99, now.AddSeconds(8)));
     }
 
     [Fact]

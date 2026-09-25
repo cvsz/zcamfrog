@@ -124,6 +124,20 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetRecentEvents_ReturnsNewestFirst()
+    {
+        _db.Log("INFO", "first");
+        _db.Log("WARN", "second");
+        var events = _db.GetRecentEvents(10);
+        Assert.Equal(2, events.Count);
+        Assert.Equal("second", events[0].Message);
+        Assert.Equal("WARN", events[0].Level);
+        Assert.Equal("first", events[1].Message);
+        Assert.Single(_db.GetRecentEvents(1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _db.GetRecentEvents(0));
+    }
+
+    [Fact]
     public void GetAccounts_CorruptStartedUtc_ReturnsNullInsteadOfThrowing()
     {
         var id = _db.Add(NewAccount("corruptdate"));

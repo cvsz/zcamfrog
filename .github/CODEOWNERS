@@ -1,6 +1,4 @@
-# Camfrog Multi-ID Manager ownership
 * @cvsz
 
 /.github/ @cvsz
 /SECURITY.md @cvsz
-/.github/CODEOWNERS @cvsz

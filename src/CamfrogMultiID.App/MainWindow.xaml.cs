@@ -29,9 +29,12 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(AccountsGrid, "Accounts");
         System.Windows.Automation.AutomationProperties.SetName(LogBox, "Application log");
         System.Windows.Automation.AutomationProperties.SetName(DetailsBox, "Selected account details");
+        System.Windows.Automation.AutomationProperties.SetName(DashboardStats, "Health summary");
+        System.Windows.Automation.AutomationProperties.SetName(EventsList, "Recent events");
         // SelectionChanged/TextChanged fire during InitializeComponent (XAML default
         // selection); ignore them until construction is complete. See startup-error.log
         // NullReferenceException at UpdateLogBox via LogLevelBox_SelectionChanged.
+        Title = $"{Strings.MainTitle} v{App.AppVersion}";
         _initialized = true;
     }
 
@@ -39,7 +42,46 @@ public partial class MainWindow : Window
     {
         RefreshRuntimeState();
         RunAutoBackupIfDue();
+        EnsureSandboxService();
+        AutoStartEnabledAccounts();
         _timer.Start();
+    }
+
+    private static void EnsureSandboxService()
+    {
+        try
+        {
+            if (!App.Settings.Load().UseSandboxie)
+                return;
+            if (ProcessSessionService.IsSandboxieReady(App.Settings.Load().SandboxieStartExe, out _))
+                return;
+            if (ProcessSessionService.TryStartSandboxieService(out var reason))
+                App.Db.Log("INFO", "SbieSvc service started automatically.");
+            else
+                App.Db.Log("WARN", $"Sandboxie service not running: {reason}");
+        }
+        catch (Exception ex)
+        {
+            try { App.Db?.Log("ERROR", $"Sandboxie auto-start failed: {ex.Message}"); } catch { }
+        }
+    }
+
+    private void AutoStartEnabledAccounts()
+    {
+        AppSettings settings;
+        try { settings = App.Settings.Load(); }
+        catch { return; }
+        if (!settings.AutoStartAccounts)
+            return;
+        List<CamfrogAccount> enabled;
+        try { enabled = App.Db.GetAccounts().Where(a => a.Enabled).ToList(); }
+        catch { return; }
+        if (enabled.Count == 0)
+            return;
+        App.Db.Log("INFO", $"Auto-starting {enabled.Count} enabled account(s).");
+        foreach (var account in enabled)
+            TryStartAccount(account, settings, interactive: false);
+        RefreshRuntimeState();
     }
 
     private static void RunAutoBackupIfDue()
@@ -167,6 +209,7 @@ public partial class MainWindow : Window
 
             UpdateDetails(view);
             UpdateStatusBar(all);
+            UpdateDashboard(all);
             UpdateLogBox();
         }
         catch (Exception ex)
@@ -241,6 +284,30 @@ public partial class MainWindow : Window
             : File.Exists(settings.ClientExecutable)
                 ? L10n.Fmt(Strings.ClientOk, settings.ClientExecutable)
                 : L10n.Fmt(Strings.ClientMissing, settings.ClientExecutable);
+    }
+
+    private void UpdateDashboard(List<CamfrogAccount> all)
+    {
+        try
+        {
+            var lines = new List<string>();
+            foreach (var account in all)
+            {
+                if (account.Status.Equals("Running", StringComparison.OrdinalIgnoreCase) && account.StartedAtUtc is DateTime started)
+                    lines.Add(L10n.Fmt(Strings.DashboardRunning, account.DisplayName, account.ProcessId, FormatDuration(DateTime.UtcNow - started.ToUniversalTime())));
+                else if (account.Status.Equals("Error", StringComparison.OrdinalIgnoreCase))
+                    lines.Add(L10n.Fmt(Strings.DashboardErrorAcct, account.DisplayName, account.LastError));
+            }
+            if (lines.Count == 0)
+                lines.Add(StatusCounts.Text);
+            DashboardStats.Text = string.Join(Environment.NewLine, lines);
+
+            var events = App.Db.GetRecentEvents(30);
+            EventsList.ItemsSource = events.Select(e => $"{e.Utc} [{e.Level}] {e.Message}").ToList();
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (InvalidOperationException) { }
     }
 
     private void UpdateLogBox()
@@ -568,10 +635,16 @@ public partial class MainWindow : Window
         RefreshRuntimeState();
     }
 
-    private void StartAccount(CamfrogAccount account, AppSettings? settings = null) =>
-        TryStartAccount(account, settings ?? App.Settings.Load(), interactive: true);
+    private void StartAccount(CamfrogAccount account, AppSettings? settings = null)
+    {
+        // Manual starts get a fresh restart budget; automatic restarts must
+        // consume it, otherwise a crashing client loops forever (each success
+        // would otherwise reset the window counter).
+        if (TryStartAccount(account, settings ?? App.Settings.Load(), interactive: true))
+            _restartPolicy.Reset(account.Id);
+    }
 
-    private bool TryStartAccount(CamfrogAccount account, AppSettings settings, bool interactive)
+    private static bool TryStartAccount(CamfrogAccount account, AppSettings settings, bool interactive)
     {
         try
         {
@@ -583,8 +656,23 @@ public partial class MainWindow : Window
                 App.Db.UpdateRuntime(account.Id, "Stopped", null, null);
             }
 
+            if (interactive && !settings.UseSandboxie && !string.IsNullOrWhiteSpace(settings.ClientExecutable))
+            {
+                var foreign = ProcessSessionService.FindForeignClientProcesses(settings.ClientExecutable, account.ProcessId);
+                if (foreign.Count > 0)
+                {
+                    App.Db.Log("WARN", $"{account.DisplayName}: untracked client already running (PID {foreign[0].ProcessId}).");
+                    var answer = MessageBox.Show(
+                        L10n.Fmt(Strings.MsgForeignClient, foreign[0].ProcessId, Environment.NewLine),
+                        Strings.TitleForeignClient,
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+                    if (answer != MessageBoxResult.Yes)
+                        return false;
+                }
+            }
+
             App.Sessions.Start(account, settings);
-            _restartPolicy.Reset(account.Id);
             return true;
         }
         catch (Exception ex)

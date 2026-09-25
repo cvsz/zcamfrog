@@ -1,15 +1,18 @@
-# Contributing to Camfrog Multi-ID Manager
+# Contributing — Camfrog Multi-ID Manager
 
-Thanks for contributing to Camfrog Multi-ID Manager.
+Thanks for contributing. This is a Windows WPF `.NET 8` project; you need
+the .NET 8 SDK on Windows x64.
 
 ## Development workflow
 
-1. Create a focused branch from `main`.
-2. Read `AGENTS.md`, `README.md`, and the relevant `docs/` guidance.
-3. Add or update regression tests for behavior changes.
-4. Run restore, Release build, tests, formatting, linting, and security checks.
-5. Update project documentation and `CHANGELOG.md` when behavior or user-visible output changes.
-6. Open a pull request and complete the project PR checklist.
+1. Fork or create a feature branch from `main`.
+2. Keep changes focused and reviewable.
+3. Add or update tests for behavior changes.
+4. Run, in order (see `docs/development.md`):
+   `dotnet restore` (solution + win-x64 graph), Debug + Release builds
+   (0 warnings), `dotnet test`, `build-release.ps1`.
+5. Update documentation and `CHANGELOG.md` when relevant.
+6. Open a pull request and complete the checklist.
 
 ## Branch naming
 
@@ -19,29 +22,14 @@ Use concise prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `t
 
 Prefer Conventional Commits, for example:
 
-- `feat: add account editing`
-- `fix: prevent PID reuse termination`
-- `security: harden credential cleanup`
-- `docs: update release procedure`
+- `feat: add project scaffolding`
+- `fix: handle empty configuration`
+- `security: harden token validation`
+- `docs: update deployment guide`
 
-## Required validation
+## Pull requests
 
-For application changes:
-
-```powershell
-dotnet restore .\CamfrogMultiID.sln
-dotnet build .\CamfrogMultiID.sln -c Release --no-restore
-dotnet test .\tests\CamfrogMultiID.Tests\CamfrogMultiID.Tests.csproj -c Release --no-restore
-dotnet format .\CamfrogMultiID.sln --verify-no-changes --no-restore
-```
-
-For a production artifact:
-
-```powershell
-.\build-release.ps1
-```
-
-Do not bypass warnings-as-errors, CodeQL, dependency review, or security gates to make a pull request green.
+Pull requests should explain the problem, implementation, testing, security impact, compatibility impact, and rollback plan where applicable. Do not bypass quality or security checks to make a pull request green.
 
 ## Security
 

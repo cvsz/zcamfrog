@@ -9,6 +9,11 @@
 bin/
 obj/
 *_wpftmp.csproj
+
+# Third-party reference material (GPL source stays out of git).
+# Only third_party/README.md is tracked.
+/third_party/*
+!/third_party/README.md
 out/
 publish/
 artifacts/

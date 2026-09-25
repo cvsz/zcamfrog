@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Threading;
 using System.IO;
 using System.Windows;
@@ -63,7 +64,7 @@ public partial class App : Application
             ApplyLanguage(Settings.Load().Language);
 
             Db.Initialize();
-            Db.Log("INFO", $"Application starting. PID={Environment.ProcessId}");
+            Db.Log("INFO", $"CamfrogMultiID v{AppVersion} starting. PID={Environment.ProcessId}");
 
             var window = new MainWindow();
             MainWindow = window;
@@ -105,6 +106,11 @@ public partial class App : Application
 
         base.OnExit(e);
     }
+
+    public static string AppVersion =>
+        Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0] ?? "unknown";
 
     public static void ApplyLanguage(string? language)
     {

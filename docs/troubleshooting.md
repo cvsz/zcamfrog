@@ -1,7 +1,7 @@
 # Troubleshooting — CI and Build Failure Modes
 
-Captured from real failures on this branch. Each entry shows the symptom,
-the root cause, and the fix that resolved it.
+Captured from real failures in this repository. Each entry shows the
+symptom, the root cause, and the fix that resolved it.
 
 ## 1. `NETSDK1004`: project.assets.json not found
 
@@ -26,7 +26,8 @@ dotnet sln CamfrogMultiID.sln add src/... src/... src/... tests/...
 ```
 
 Verify with `dotnet restore -v diag | Select-String BuildProjectInSolution`
-(all entries must read `True`).
+(all entries must read `True`). Always follow with the `win-x64` graph
+restore before publish (see `build-release.ps1`).
 
 ## 2. `MSB4121`: project not selected for building
 
@@ -40,7 +41,7 @@ solution configuration "Release|Any CPU".
 Root cause: same truncated-GUID corruption as above. Do not suppress it;
 fix the `.sln` (see entry 1).
 
-## 3. `CS0246`: `FactAttribute` not found (xunit v3)
+## 3. `CS0246`: `FactAttribute` not found
 
 Symptom:
 
@@ -48,8 +49,8 @@ Symptom:
 error CS0246: The type or namespace name 'FactAttribute' could not be found
 ```
 
-Root cause: the test project uses the `xunit.v3` package but never imports
-its namespace. `ImplicitUsings` does not include it automatically.
+Root cause: the test project references an xunit package but never
+imports its namespace. `ImplicitUsings` does not include it automatically.
 
 Fix: add to the test `.csproj`:
 
@@ -70,20 +71,18 @@ Root cause: analyzer naming rule conflicts with the
 Fix: keep production projects strict, exempt only the test project:
 
 ```xml
-<NoWarn>CA1707</NoWarn>
+<NoWarn>CA1707;xUnit1031</NoWarn>
 ```
 
-## 5. Marker scan fails on `AGENTS.md`
+## 5. Marker scan fails on its own definition document
 
-Symptom: the CI "Scan for unfinished implementation markers" job fails
-with hits in `AGENTS.md` (`TODO`, `FIXME`, `NotImplementedException`).
+Symptom: a "scan for unfinished markers" job fails with hits in the
+document that defines the searched patterns (`TODO`, `FIXME`,
+`NotImplementedException`).
 
-Root cause: `AGENTS.md` documents the defect-pattern search list, so the
-scan matches its own definition. Exclude the defining document:
-
-```text
-':!AGENTS.md'
-```
+Root cause: the scan matches its own definition. Exclude defining
+documents (`CHANGELOG.md`, `AGENTS.md`, workflow self-references,
+`Makefile`) from the grep.
 
 ## 6. `GenerateBundle` file lock on publish
 
@@ -118,3 +117,14 @@ constructed.
 Fix: gate all XAML-wired change handlers (and any refresh entry point
 they call) behind an `_initialized` flag set at the end of the
 constructor.
+
+## 8. Stray `*_wpftmp.csproj` files in git status
+
+Symptom: `CamfrogMultiID.App_<random>_wpftmp.csproj` appears as an
+untracked file after building.
+
+Root cause: the WPF build generates a temporary project during
+markup compilation. It must never be committed.
+
+Fix: it is covered by `*_wpftmp.csproj` in `.gitignore`. If one was
+staged, unstage and delete it.
