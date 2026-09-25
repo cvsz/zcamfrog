@@ -126,4 +126,35 @@ public sealed class BackupServiceTests : IDisposable
         }
         Assert.Throws<InvalidDataException>(() => BackupService.RestoreBackup(_paths, zip));
     }
+
+    [Fact]
+    public void RestoreBackup_RejectsNestedSecretEntry()
+    {
+        var zip = Path.Combine(_tempRoot, "nested-secret.zip");
+        using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+        {
+            var db = archive.CreateEntry(BackupService.DatabaseEntry);
+            using (var s = db.Open()) { }
+            var evil = archive.CreateEntry("secrets/nested/evil.bin");
+            using (var w = new StreamWriter(evil.Open(), Encoding.UTF8)) { w.Write("x"); }
+        }
+
+        Assert.Throws<InvalidDataException>(() => BackupService.RestoreBackup(_paths, zip));
+        Assert.False(File.Exists(Path.Combine(_paths.Secrets, "evil.bin")));
+    }
+
+    [Fact]
+    public void RestoreBackup_RejectsDriveQualifiedEntry()
+    {
+        var zip = Path.Combine(_tempRoot, "drive-entry.zip");
+        using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+        {
+            var db = archive.CreateEntry(BackupService.DatabaseEntry);
+            using (var s = db.Open()) { }
+            var evil = archive.CreateEntry("C:/outside.bin");
+            using (var w = new StreamWriter(evil.Open(), Encoding.UTF8)) { w.Write("x"); }
+        }
+
+        Assert.Throws<InvalidDataException>(() => BackupService.RestoreBackup(_paths, zip));
+    }
 }
