@@ -24,6 +24,8 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 
 ## [Unreleased]
 ### Added
+- Merged `security/code-scanning-hardening`: immutable SHA-pinned Actions (all 6 verified against annotated tags), fail-closed CI/Release builds (fallback removed), Zip Slip leaf-enforcement + adversarial backup tests
+- Deps: `System.Management` + `System.ServiceProcess.ServiceController` 8.0.0→10.0.12 (verified `net8.0-windows`, 102/102)
 - Online/offline + room dashboard: Presence/Room grid columns, honest join evidence (live client command lines scanned for the room link; server-side membership correctly reported as unobservable), room name parsing
 - Reviewed co-agent work (domain validation, schema versioning, ACL reporting, adversarial tests); fixed its `Stop_RefusesLiveForeignProcess` test, which set runtime state on the transient object instead of via `UpdateRuntime` and therefore proved nothing
 
