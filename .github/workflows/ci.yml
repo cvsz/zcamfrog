@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Validate required project files
         shell: bash
@@ -61,10 +61,10 @@ jobs:
     needs: repository-baseline
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
 
@@ -90,13 +90,7 @@ jobs:
 
       - name: Build Release
         shell: pwsh
-        run: |
-          dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Solution build fallback: building App project directly"
-            dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore --verbosity minimal
-            if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
-          }
+        run: dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
 
       - name: Test
         shell: pwsh
@@ -113,7 +107,7 @@ jobs:
           (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash | Out-Host
 
       - name: Upload publish artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: CamfrogMultiID-win-x64
           path: src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/

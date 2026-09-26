@@ -29,16 +29,17 @@ jobs:
             build-mode: manual
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET 8 (csharp)
         if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        if: matrix.language == 'csharp' || matrix.language == 'actions'
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql-config.yml
@@ -46,20 +47,16 @@ jobs:
 
       - name: Autobuild (actions)
         if: matrix.build-mode == 'none'
-        uses: github/codeql-action/autobuild@v4
+        uses: github/codeql-action/autobuild@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
 
       - name: Build C# (manual)
-        if: matrix.language == 'csharp'
+        if: matrix.build-mode == 'manual'
         shell: pwsh
         run: |
           dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64
           dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
-          if ($LASTEXITCODE -ne 0) {
-            dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore --verbosity minimal
-            if ($LASTEXITCODE -ne 0) { throw "Build failed for CodeQL" }
-          }
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: "/language:${{ matrix.language }}"

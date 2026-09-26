@@ -25,13 +25,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout exact tag
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
 
@@ -75,7 +75,7 @@ jobs:
           "$hash  $(Split-Path -Leaf $archive)" | Set-Content -Encoding utf8 -LiteralPath "$archive.sha256"
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: 'CamfrogMultiID-*-win-x64.zip'
 
