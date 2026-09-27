@@ -123,11 +123,30 @@ public sealed class DatabaseServiceTests : IDisposable
     Assert.Empty(_db.GetAccounts());
   }
 
-  [Fact]
-  public void SchemaVersion_MatchesExpected()
-  {
-    Assert.Equal(DatabaseService.SchemaVersion, _db.GetSchemaVersion());
-  }
+    [Fact]
+    public void SchemaVersion_MatchesExpected()
+    {
+        Assert.Equal(DatabaseService.SchemaVersion, _db.GetSchemaVersion());
+    }
+
+    [Fact]
+    public void Initialize_MalformedDatabase_ThrowsSqliteException()
+    {
+        // Callers (App startup) catch and degrade; the layer must fail with
+        // a typed error, never undefined behavior.
+        var badRoot = Path.Combine(Path.GetTempPath(), "zcamfrog-tests-bad-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(badRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(badRoot, "camfrog.db"), "not a database at all");
+            var badDb = new DatabaseService(new AppPaths(badRoot));
+            Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => badDb.Initialize());
+        }
+        finally
+        {
+            try { Directory.Delete(badRoot, true); } catch { }
+        }
+    }
 
   [Fact]
   public void UpdateDetails_ValidatesDomain()

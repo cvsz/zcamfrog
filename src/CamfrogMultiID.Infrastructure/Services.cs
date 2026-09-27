@@ -894,6 +894,8 @@ public sealed class ProcessSessionService
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(roomUrl);
     var trimmed = roomUrl.Trim();
+    if (trimmed.Length > 500)
+      throw new InvalidOperationException("Room URL is too long (max 500 characters).");
     if (!trimmed.StartsWith("camfrog:", StringComparison.OrdinalIgnoreCase))
       throw new InvalidOperationException("Room URL must use the camfrog: scheme (copy the room link from the client room directory).");
     if (trimmed.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))

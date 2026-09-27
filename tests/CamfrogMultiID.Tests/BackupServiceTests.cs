@@ -114,6 +114,43 @@ public sealed class BackupServiceTests : IDisposable
     }
 
     [Fact]
+    public void RestoreBackup_RejectsUncAndNestedTraversal()
+    {
+        foreach (var evil in new[] { "\\\\server\\share\\evil.bin", "secrets/a/../../evil.bin", "secrets/./x.bin", "/absolute/path.bin", "C:\\evil.bin" })
+        {
+            var zip = Path.Combine(_tempRoot, Guid.NewGuid().ToString("N") + ".zip");
+            using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+            {
+                var db = archive.CreateEntry(BackupService.DatabaseEntry);
+                using (var s = db.Open()) { }
+                var entry = archive.CreateEntry(evil);
+                using (var w = new StreamWriter(entry.Open(), Encoding.UTF8)) { w.Write("x"); }
+            }
+            Assert.Throws<InvalidDataException>(() => BackupService.RestoreBackup(_paths, zip));
+        }
+    }
+
+    [Fact]
+    public void RestoreBackup_DuplicateEntries_AreDeterministic()
+    {
+        var zip = Path.Combine(_tempRoot, "dup.zip");
+        using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+        {
+            var db = archive.CreateEntry(BackupService.DatabaseEntry);
+            using (var s = db.Open()) { }
+            for (var i = 0; i < 3; i++)
+            {
+                var entry = archive.CreateEntry(BackupService.SettingsEntry);
+                using var w = new StreamWriter(entry.Open(), Encoding.UTF8);
+                w.Write("{}");
+            }
+        }
+        // Must not throw and must not escape: last write wins, same target.
+        BackupService.RestoreBackup(_paths, zip);
+        Assert.True(File.Exists(_paths.Settings));
+    }
+
+    [Fact]
     public void RestoreBackup_RejectsAbsoluteEntry()
     {
         var zip = Path.Combine(_tempRoot, "abs.zip");

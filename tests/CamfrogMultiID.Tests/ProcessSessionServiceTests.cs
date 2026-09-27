@@ -150,8 +150,34 @@ public sealed class ProcessSessionServiceTests : IDisposable
     Assert.DoesNotContain(excluded, f => f.ProcessId == self.Id);
   }
 
-  [Fact]
-  public void Start_MissingExecutable_Throws()
+    [Fact]
+    public void IsTrackedProcessAlive_ExitedProcess_ReportsExited()
+    {
+        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        var acc = new CamfrogAccount
+        {
+            DisplayName = "shortlived",
+            Username = "shortlived_" + Guid.NewGuid().ToString("N"),
+            PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+            ProfileDirectory = Path.Combine(_tempRoot, "p_short"),
+            Enabled = true
+        };
+        acc.Id = _db.Add(acc);
+        var settings = new AppSettings { ClientExecutable = cmd, ClientArgumentsTemplate = "/c exit 0" };
+        using var process = _svc.Start(acc, settings);
+        Assert.True(process.WaitForExit(10000));
+        var tracked = _db.GetById(acc.Id)!;
+        Assert.False(ProcessSessionService.IsTrackedProcessAlive(tracked, out var reason));
+        // Either the exit was observed or the PID was already reaped.
+        Assert.True(
+            reason is not null && (reason.Contains("xited", StringComparison.OrdinalIgnoreCase) || reason.Contains("no longer exists", StringComparison.OrdinalIgnoreCase)),
+            $"Unexpected reason: {reason}");
+        _svc.Stop(tracked);
+        Assert.Equal("Stopped", _db.GetById(acc.Id)!.Status);
+    }
+
+    [Fact]
+    public void Start_MissingExecutable_Throws()
   {
     var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_tempRoot, "p1") };
     var settings = new AppSettings { ClientExecutable = "", ClientArgumentsTemplate = "" };

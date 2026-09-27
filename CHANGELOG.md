@@ -43,7 +43,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - Settings: exe existence status, template warning validation, data folder display + open-folder
 - Backend: `GetById`, `UpdateDetails`, `SetEnabled`, `Delete`, `ClearError`, `UsernameExistsExcept`, `CredentialService.Exists/Delete`, `PreviewCommandLine/PreviewArguments/ValidateArgumentsTemplate`
 - Dependencies (verified `net8.0-windows`): `Microsoft.Data.Sqlite` 8.0.30→10.0.12, `ProtectedData` 8.0.0→10.0.12, `Test.Sdk` 17.8.0→18.10.1, `coverlet` 6.0.0→10.0.1, `xunit` 2.5.3→2.9.3, `runner.visualstudio` 2.5.3→4.0.0; Actions `checkout` v4→v7, `setup-dotnet` v4→v6, `upload-artifact` v4→v7
-- Tests: 86 xUnit tests (DatabaseService, CredentialService, SettingsService, ProcessSessionService, backup, diagnostics, localization, restart policy)
+- Tests: xUnit coverage across DatabaseService, CredentialService, SettingsService, ProcessSessionService, backup, diagnostics, localization, restart policy (exact count reported by CI, never hand-maintained here)
 - Startup crash fix: guard `MainWindow` event handlers during `InitializeComponent` (`_initialized`), corrupt dates parse to null instead of throwing, refresh loop catches and logs instead of killing the UI
 - Sandbox multi-instance (experimental): optional Sandboxie-Plus launch per account (`Start.exe /wait /Box:<user>`, box name sanitized); env-redirection alone proven insufficient (client mutex)
 - Auto-join rooms: per-account `RoomUrl` (`camfrog:` scheme validated) appended as `--url=` (registry-verified client switch); launch preview shows full sandboxed command
