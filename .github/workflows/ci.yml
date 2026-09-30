@@ -107,6 +107,8 @@ jobs:
         run: |
           if (-not (Test-Path -LiteralPath "src/CamfrogMultiID.App/obj/project.assets.json")) { throw "project.assets.json missing after restore" }
           Get-ChildItem src/*/obj/project.assets.json | ForEach-Object { Write-Host $_.FullName }
+          $targets = (Get-Content "src/CamfrogMultiID.App/obj/project.assets.json" -Raw | ConvertFrom-Json).targets.PSObject.Properties.Name
+          if (-not ($targets -match '/win-x64$')) { throw "win-x64 restore did not produce a win-x64 target: $($targets -join ', ')" }
 
       - name: Build Debug
         shell: pwsh
@@ -149,6 +151,13 @@ jobs:
       - name: Publish self-contained win-x64
         shell: pwsh
         run: |
+          # The SBOM tools shell out to MSBuild and restore the solution, which
+          # drops the win-x64 target from the assets file. Re-restore the RID
+          # graph right before publishing and assert the target is present, so
+          # a regression fails here instead of as an opaque NETSDK1047.
+          dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64 --verbosity minimal
+          $targets = (Get-Content "src/CamfrogMultiID.App/obj/project.assets.json" -Raw | ConvertFrom-Json).targets.PSObject.Properties.Name
+          if (-not ($targets -match '/win-x64$')) { throw "no win-x64 target before publish: $($targets -join ', ')" }
           dotnet publish src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --no-restore --verbosity minimal
           $exe = "src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/CamfrogMultiID.exe"
           if (-not (Test-Path -LiteralPath $exe)) { throw "Published executable not found: $exe" }

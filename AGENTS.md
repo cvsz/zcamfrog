@@ -75,6 +75,11 @@ about what the third-party Camfrog client can and cannot do.
   any workflow that builds the solution afterwards must restore the solution
   first. CodeQL's manual build previously failed with
   `Assets file 'tests/.../project.assets.json' not found` for this reason.
+- Conversely, anything that shells out to MSBuild and restores the solution
+  (`dotnet CycloneDX`, `dotnet list package`) *removes* the `win-x64` target
+  from `project.assets.json`, and a later `publish --no-restore` then fails
+  with `NETSDK1047`. Re-run the `win-x64` restore immediately before publish
+  and assert `/win-x64$` is among the assets target keys.
 - Without `global.json`, `dotnet` on a GitHub runner silently uses the newest
   SDK its image ships, not the one `setup-dotnet` installed. A newer analyzer
   set then enables new `AnalysisLevel=latest-recommended` rules (CA1859 broke
