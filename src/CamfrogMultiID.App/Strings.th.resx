@@ -515,4 +515,34 @@
   <data name="ColRoom" xml:space="preserve">
     <value>ห้อง</value>
   </data>
+  <data name="StateOffline" xml:space="preserve">
+    <value>ออฟไลน์</value>
+  </data>
+  <data name="StateStarting" xml:space="preserve">
+    <value>กำลังเริ่ม</value>
+  </data>
+  <data name="StateAwaitingLogin" xml:space="preserve">
+    <value>รอเข้าสู่ระบบ</value>
+  </data>
+  <data name="StateIdle" xml:space="preserve">
+    <value>ออนไลน์ (ไม่มีห้อง)</value>
+  </data>
+  <data name="StateRoomRequested" xml:space="preserve">
+    <value>ส่งลิงก์ห้องแล้ว</value>
+  </data>
+  <data name="StateRoomNotObserved" xml:space="preserve">
+    <value>ยังไม่พบลิงก์ห้อง</value>
+  </data>
+  <data name="StateOrphaned" xml:space="preserve">
+    <value>ไคลเอนต์ค้างนอกระบบ</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>ไม่ทราบ</value>
+  </data>
+  <data name="StateUntrackedClients" xml:space="preserve">
+    <value>พบไคลเอนต์ {0} โปรเซสที่ไม่ได้อยู่ในการติดตามของบัญชีใด (เปิดเอง?) ดู docs/account-status.md</value>
+  </data>
+  <data name="StateEvidenceLabel" xml:space="preserve">
+    <value>หลักฐาน</value>
+  </data>
 </root>

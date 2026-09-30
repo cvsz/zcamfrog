@@ -22,7 +22,7 @@
             <StatusBarItem><TextBlock x:Name="StatusClient" Text="—"/></StatusBarItem>
         </StatusBar>
         <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto" MaxHeight="170"/><RowDefinition Height="180"/></Grid.RowDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto" MaxHeight="170"/><RowDefinition Height="180"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <DataGrid x:Name="AccountsGrid" Grid.Row="0" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" Margin="0,10" CanUserAddRows="False" SelectionChanged="AccountsGrid_SelectionChanged" MouseDoubleClick="AccountsGrid_DoubleClick" KeyDown="AccountsGrid_KeyDown">
                 <DataGrid.ContextMenu>
                     <ContextMenu>
@@ -79,6 +79,7 @@
                     <TextBox x:Name="LogBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="6" FontFamily="Consolas, Leelawadee UI, Segoe UI"/>
                 </DockPanel>
             </GroupBox>
+            <TextBlock x:Name="UntrackedBanner" Grid.Row="4" TextWrapping="Wrap" Margin="0,6,0,0" Padding="6" FontWeight="SemiBold" Foreground="#B26A00" Visibility="Collapsed"/>
         </Grid>
     </DockPanel>
 </Window>

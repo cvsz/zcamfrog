@@ -922,6 +922,270 @@ public sealed class ProcessSessionService
 
   public sealed record LiveClient(int ProcessId, string CommandLine, DateTime StartTimeUtc);
 
+  /// <summary>
+  /// One live client process with the evidence needed to attribute it to a
+  /// single account. ParentProcessId lets the resolver walk the ancestry up
+  /// to the tracked wrapper PID, so two accounts in the same room can never
+  /// claim each other's client.
+  /// </summary>
+  public sealed record ClientProcessInfo(
+      int ProcessId,
+      int ParentProcessId,
+      string CommandLine,
+      DateTime StartTimeUtc,
+      string MainWindowTitle);
+
+  /// <summary>
+  /// One evidence sweep: the client processes plus the parent map for every
+  /// process on the box. The full map is required because intermediate
+  /// ancestors (Sandboxie helpers, launchers) are not clients themselves,
+  /// so a client cannot be attributed by walking the client list alone.
+  /// </summary>
+  public sealed record ClientProcessSnapshot(
+      IReadOnlyList<ClientProcessInfo> Clients,
+      IReadOnlyDictionary<int, int> ParentOf);
+
+  public sealed record RuntimeStateView(
+      long AccountId,
+      AccountRuntimeState State,
+      string RoomName,
+      string Evidence,
+      IReadOnlyList<int> ClientProcessIds);
+
+  /// <summary>Result of one evidence sweep: states plus the clients nobody owns.</summary>
+  public sealed record RuntimeStateReport(
+      IReadOnlyList<RuntimeStateView> Accounts,
+      IReadOnlyList<ClientProcessInfo> UntrackedClients,
+      bool EvidenceAvailable);
+
+  /// <summary>
+  /// Reads every live client process plus the system-wide parent map in a
+  /// single WMI pass. Returns null when the evidence source itself is
+  /// unavailable, so the caller can fail closed instead of reporting
+  /// "offline" for a client that is actually running.
+  /// </summary>
+  public static ClientProcessSnapshot? GetClientProcessSnapshot(string clientExecutable)
+  {
+    if (string.IsNullOrWhiteSpace(clientExecutable))
+      return null;
+    string expectedFull;
+    try
+    {
+      expectedFull = Path.GetFullPath(clientExecutable);
+    }
+    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+    {
+      return null;
+    }
+
+    var result = new List<ClientProcessInfo>();
+    var parentOf = new Dictionary<int, int>();
+    try
+    {
+      using var searcher = new System.Management.ManagementObjectSearcher(
+          "SELECT ProcessId, ParentProcessId, CommandLine, ExecutablePath, CreationDate FROM Win32_Process");
+      foreach (var obj in searcher.Get())
+      {
+        using (obj)
+        {
+          if (!TryInt(obj["ProcessId"], out var pid) || !TryInt(obj["ParentProcessId"], out var ppid))
+            continue;
+          parentOf[pid] = ppid;
+
+          var path = obj["ExecutablePath"]?.ToString() ?? string.Empty;
+          if (path.Length == 0 || !string.Equals(path, expectedFull, StringComparison.OrdinalIgnoreCase))
+            continue;
+
+          DateTime started;
+          try
+          {
+            var created = obj["CreationDate"]?.ToString();
+            started = string.IsNullOrEmpty(created)
+                ? DateTime.MinValue
+                : System.Management.ManagementDateTimeConverter.ToDateTime(created).ToUniversalTime();
+          }
+          catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidCastException)
+          {
+            continue;
+          }
+          result.Add(new ClientProcessInfo(pid, ppid, obj["CommandLine"]?.ToString() ?? string.Empty, started, string.Empty));
+        }
+      }
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException
+        or System.Runtime.InteropServices.COMException or System.Management.ManagementException)
+    {
+      return null;
+    }
+
+    // Window titles need the managed Process API; enrich best-effort only.
+    var handles = new List<Process>();
+    try
+    {
+      foreach (var info in result)
+      {
+        Process proc;
+        try
+        {
+          proc = Process.GetProcessById(info.ProcessId);
+        }
+        catch (ArgumentException) { continue; }
+        handles.Add(proc);
+        string title;
+        try
+        {
+          title = proc.MainWindowTitle;
+        }
+        catch (InvalidOperationException) { continue; }
+        catch (System.ComponentModel.Win32Exception) { continue; }
+        if (!string.IsNullOrEmpty(title))
+          result[result.IndexOf(info)] = info with { MainWindowTitle = title };
+      }
+    }
+    finally
+    {
+      foreach (var proc in handles)
+        proc.Dispose();
+    }
+    return new ClientProcessSnapshot(result, parentOf);
+  }
+
+  private static bool TryInt(object? value, out int result)
+  {
+    result = 0;
+    if (value is null)
+      return false;
+    try
+    {
+      result = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+      return true;
+    }
+    catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+    {
+      return false;
+    }
+  }
+
+  /// <summary>
+  /// Resolves every account's runtime state from one evidence snapshot.
+  /// Pure function: no process or database access, so the whole matrix is
+  /// table-testable. Attribution walks ParentProcessId up to
+  /// <paramref name="maxDepth"/> hops; a client belongs to the account whose
+  /// tracked PID is its ancestor, so accounts sharing a room never claim each
+  /// other's client.
+  /// </summary>
+  public static RuntimeStateReport ResolveRuntimeStates(
+      IReadOnlyList<CamfrogAccount> accounts,
+      ClientProcessSnapshot? snapshot,
+      IReadOnlySet<int> liveTrackedProcessIds,
+      int maxDepth = 16)
+  {
+    ArgumentNullException.ThrowIfNull(accounts);
+
+    if (snapshot is null)
+    {
+      // Evidence unavailable: fail closed, never claim "offline".
+      return new RuntimeStateReport(
+          accounts.Select(a => new RuntimeStateView(a.Id, AccountRuntimeState.Unknown, ParseRoomName(a.RoomUrl), string.Empty, []))
+              .ToList(),
+          [],
+          false);
+    }
+
+    var clients = snapshot.Clients;
+    var parentOf = snapshot.ParentOf;
+
+    var tracked = new Dictionary<int, CamfrogAccount>();
+    foreach (var account in accounts)
+    {
+      if (account.ProcessId is int pid && pid > 0)
+        tracked[pid] = account;
+    }
+
+    var owners = new Dictionary<int, long>(); // clientPid -> accountId
+    var untracked = new List<ClientProcessInfo>();
+
+    foreach (var client in clients)
+    {
+      long? owner = null;
+      if (tracked.TryGetValue(client.ProcessId, out var self))
+      {
+        // Non-sandboxed launch: the tracked PID is the client itself.
+        owner = self.Id;
+      }
+      else
+      {
+        // Walk real ancestry: intermediate helpers are not in the client list.
+        var current = client.ParentProcessId;
+        var seen = new HashSet<int> { client.ProcessId };
+        for (var depth = 0; depth < maxDepth && current > 0 && seen.Add(current); depth++)
+        {
+          if (tracked.TryGetValue(current, out var ancestor))
+          {
+            owner = ancestor.Id;
+            break;
+          }
+          if (!parentOf.TryGetValue(current, out var next) || next <= 0)
+            break;
+          current = next;
+        }
+      }
+
+      if (owner is long accountId)
+        owners[client.ProcessId] = accountId;
+      else
+        untracked.Add(client);
+    }
+
+    var views = new List<RuntimeStateView>(accounts.Count);
+    foreach (var account in accounts)
+    {
+      var mine = clients.Where(c => owners.TryGetValue(c.ProcessId, out var id) && id == account.Id).ToList();
+      var trackedAlive = account.ProcessId is int own && liveTrackedProcessIds.Contains(own);
+      var roomName = ParseRoomName(account.RoomUrl);
+      var ids = mine.Select(c => c.ProcessId).OrderBy(p => p).ToList();
+      var (state, evidence) = ResolveOne(account, mine, trackedAlive, roomName, account.ProcessId is int);
+      views.Add(new RuntimeStateView(account.Id, state, roomName, evidence, ids));
+    }
+
+    return new RuntimeStateReport(views, untracked, true);
+  }
+
+  private static (AccountRuntimeState State, string Evidence) ResolveOne(
+      CamfrogAccount account,
+      IReadOnlyList<ClientProcessInfo> mine,
+      bool trackedAlive,
+      string roomName,
+      bool hasTrackedPid)
+  {
+    if (mine.Count == 0)
+    {
+      if (!hasTrackedPid)
+        return (AccountRuntimeState.Offline, "no tracked process recorded");
+      return trackedAlive
+          ? (AccountRuntimeState.Starting, "wrapper alive, client not yet attributable")
+          : (AccountRuntimeState.Offline, "tracked wrapper is not running");
+    }
+
+    if (hasTrackedPid && !trackedAlive)
+      return (AccountRuntimeState.Orphaned, "client process " + string.Join(",", mine.Select(c => c.ProcessId)) + " outlived the tracked wrapper");
+
+    var hasWindow = mine.Any(c => !string.IsNullOrWhiteSpace(c.MainWindowTitle));
+    if (!string.IsNullOrEmpty(roomName))
+    {
+      var wanted = account.RoomUrl.Trim();
+      var delivered = mine.Where(c => !string.IsNullOrEmpty(c.CommandLine) &&
+          c.CommandLine.Contains(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+      return delivered.Count > 0
+          ? (AccountRuntimeState.RoomRequested, "room link present on client " + string.Join(",", delivered.Select(c => c.ProcessId)))
+          : (AccountRuntimeState.RoomNotObserved, "room link absent from client " + string.Join(",", mine.Select(c => c.ProcessId)));
+    }
+
+    return hasWindow
+        ? (AccountRuntimeState.Idle, "client window: " + mine.First(c => !string.IsNullOrWhiteSpace(c.MainWindowTitle)).MainWindowTitle)
+        : (AccountRuntimeState.AwaitingLogin, "client running, no window realized (login is manual per box)");
+  }
+
   public sealed record PresenceView(
       bool Online,
       string PresenceDisplay,
@@ -948,97 +1212,6 @@ public sealed class ProcessSessionService
         return Uri.UnescapeDataString(kv[1].Replace("+", " ", StringComparison.Ordinal)).Trim();
     }
     return string.Empty;
-  }
-
-  /// <summary>
-  /// Scans live client processes (by executable file name) and reads
-  /// their command lines. Best-effort: processes that vanish or deny
-  /// access are skipped.
-  /// </summary>
-  public static IReadOnlyList<LiveClient> GetLiveClients(string clientExecutable)
-  {
-    var result = new List<LiveClient>();
-    string processName;
-    try
-    {
-      processName = Path.GetFileNameWithoutExtension(Path.GetFullPath(clientExecutable));
-    }
-    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-    {
-      return result;
-    }
-    if (string.IsNullOrWhiteSpace(processName))
-      return result;
-
-    Process[] candidates;
-    try { candidates = Process.GetProcessesByName(processName); }
-    catch (InvalidOperationException) { return result; }
-
-    foreach (var candidate in candidates)
-    {
-      using (candidate)
-      {
-        try
-        {
-          if (candidate.HasExited)
-            continue;
-          var cmdline = GetCommandLine(candidate.Id);
-          DateTime started;
-          try { started = candidate.StartTime.ToUniversalTime(); }
-          catch (InvalidOperationException) { continue; }
-          catch (System.ComponentModel.Win32Exception) { continue; }
-          result.Add(new LiveClient(candidate.Id, cmdline, started));
-        }
-        catch (InvalidOperationException) { }
-        catch (System.ComponentModel.Win32Exception) { }
-      }
-    }
-    return result;
-  }
-
-  private static string GetCommandLine(int pid)
-  {
-    try
-    {
-      using var searcher = new System.Management.ManagementObjectSearcher(
-          $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {pid}");
-      foreach (var obj in searcher.Get())
-      {
-        using (obj)
-        {
-          return obj["CommandLine"]?.ToString() ?? string.Empty;
-        }
-      }
-    }
-    catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException or System.Management.ManagementException)
-    {
-    }
-    return string.Empty;
-  }
-
-  /// <summary>
-  /// Builds the per-account presence/room view. Honest by design: the
-  /// manager can prove a client runs and was launched with a room link,
-  /// but server-side room membership is not visible locally.
-  /// </summary>
-  public static PresenceView BuildPresenceView(CamfrogAccount account, IReadOnlyList<LiveClient> liveClients, bool trackedAlive)
-  {
-    ArgumentNullException.ThrowIfNull(account);
-    ArgumentNullException.ThrowIfNull(liveClients);
-    var roomName = ParseRoomName(account.RoomUrl);
-    if (!trackedAlive)
-      return new PresenceView(false, "Offline", string.IsNullOrEmpty(roomName) ? "—" : roomName, roomName, false);
-    if (string.IsNullOrEmpty(roomName))
-      return new PresenceView(true, "Online", "—", string.Empty, false);
-    var observed = liveClients.Any(c =>
-        !string.IsNullOrEmpty(c.CommandLine) &&
-        c.CommandLine.Contains(account.RoomUrl.Trim(), StringComparison.OrdinalIgnoreCase));
-    return new PresenceView(
-        true,
-        "Online",
-        observed ? roomName : roomName + " (not observed)",
-        roomName,
-        observed);
   }
 
   /// <summary>

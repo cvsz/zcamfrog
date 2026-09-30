@@ -255,40 +255,107 @@ public partial class MainWindow : Window
         $"Profile: {account.ProfileDirectory} {(profileExists ? "[exists]" : "[missing]")}\n" +
         $"Secret: {account.PasswordSecretName} {(secretExists ? "[DPAPI protected]" : "[missing]")}  Exe: {(string.IsNullOrWhiteSpace(account.ProcessExecutablePath) ? "—€”" : account.ProcessExecutablePath)}\n" +
         $"Room: {(string.IsNullOrWhiteSpace(account.RoomUrl) ? "—€”" : account.RoomUrl)}  Password age: {passwordAge}  Presence: {account.PresenceDisplay}\n" +
+        $"Client state: {account.RuntimeState}  {Strings.StateEvidenceLabel}: {(string.IsNullOrWhiteSpace(account.StateEvidence) ? "-" : account.StateEvidence)}\n" +
         (settings.UseSandboxie
             ? $"Box: {ProcessSessionService.SanitizeBoxName(account)} {(ProcessSessionService.BoxExists(ProcessSessionService.SanitizeBoxName(account)) ? "[created]" : "[not created —€” use Settings]")}\n"
             : string.Empty) +
         $"Launch: {preview}";
   }
 
-  private static void ApplyPresenceView(List<CamfrogAccount> all)
+  private void ApplyPresenceView(List<CamfrogAccount> all)
   {
-    IReadOnlyList<ProcessSessionService.LiveClient> live = [];
+    ProcessSessionService.ClientProcessSnapshot? snapshot = null;
     try
     {
       var exe = App.Settings.Load().ClientExecutable;
       if (!string.IsNullOrWhiteSpace(exe))
-        live = ProcessSessionService.GetLiveClients(exe);
-    }
+        snapshot = ProcessSessionService.GetClientProcessSnapshot(exe);
+      }
     catch (IOException) { }
     catch (UnauthorizedAccessException) { }
+
+    // Tracked wrapper liveness is the identity check: PID + start time + exe.
+    var liveTracked = new HashSet<int>();
     foreach (var account in all)
     {
       try
       {
-        var trackedAlive = account.ProcessId is int &&
-            ProcessSessionService.IsTrackedProcessAlive(account, out _);
-        var view = ProcessSessionService.BuildPresenceView(account, live, trackedAlive);
-        account.PresenceDisplay = view.PresenceDisplay;
-        account.RoomDisplay = view.RoomDisplay;
+        if (account.ProcessId is int pid && ProcessSessionService.IsTrackedProcessAlive(account, out _))
+          liveTracked.Add(pid);
+      }
+      catch (IOException) { }
+      catch (UnauthorizedAccessException) { }
+    }
+
+    ProcessSessionService.RuntimeStateReport report;
+    try
+    {
+      report = ProcessSessionService.ResolveRuntimeStates(all, snapshot, liveTracked);
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+    {
+      foreach (var account in all)
+      {
+        account.RuntimeState = AccountRuntimeState.Unknown;
+        account.PresenceDisplay = Strings.StateUnknown;
+        account.RoomDisplay = ProcessSessionService.ParseRoomName(account.RoomUrl);
+        account.StateEvidence = string.Empty;
+      }
+        UntrackedBanner.Text = string.Empty;
+        UntrackedBanner.Visibility = Visibility.Collapsed;
+        return;
+    }
+
+    foreach (var account in all)
+    {
+      try
+      {
+        var view = report.Accounts.FirstOrDefault(v => v.AccountId == account.Id);
+        if (view is null)
+        {
+          account.RuntimeState = AccountRuntimeState.Unknown;
+          account.PresenceDisplay = Strings.StateUnknown;
+          account.RoomDisplay = string.Empty;
+          account.StateEvidence = string.Empty;
+          continue;
+        }
+        account.RuntimeState = view.State;
+        account.PresenceDisplay = StateDisplay(view.State);
+        account.RoomDisplay = string.IsNullOrEmpty(view.RoomName)
+            ? "—"
+            : view.State == AccountRuntimeState.RoomNotObserved
+                ? view.RoomName + " (not observed)"
+                : view.RoomName;
+        account.StateEvidence = view.Evidence;
       }
       catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
       {
-        account.PresenceDisplay = "Unknown";
+        account.RuntimeState = AccountRuntimeState.Unknown;
+        account.PresenceDisplay = Strings.StateUnknown;
         account.RoomDisplay = ProcessSessionService.ParseRoomName(account.RoomUrl);
+        account.StateEvidence = string.Empty;
       }
     }
+
+    UntrackedBanner.Text = report.UntrackedClients.Count == 0
+        ? string.Empty
+        : L10n.Fmt(Strings.StateUntrackedClients, report.UntrackedClients.Count);
+    UntrackedBanner.Visibility = report.UntrackedClients.Count == 0
+        ? Visibility.Collapsed
+        : Visibility.Visible;
   }
+
+  private static string StateDisplay(AccountRuntimeState state) => state switch
+  {
+    AccountRuntimeState.Offline => Strings.StateOffline,
+    AccountRuntimeState.Starting => Strings.StateStarting,
+    AccountRuntimeState.AwaitingLogin => Strings.StateAwaitingLogin,
+    AccountRuntimeState.Idle => Strings.StateIdle,
+    AccountRuntimeState.RoomRequested => Strings.StateRoomRequested,
+    AccountRuntimeState.RoomNotObserved => Strings.StateRoomNotObserved,
+    AccountRuntimeState.Orphaned => Strings.StateOrphaned,
+    _ => Strings.StateUnknown,
+  };
 
   private static string FormatDuration(TimeSpan span)
   {

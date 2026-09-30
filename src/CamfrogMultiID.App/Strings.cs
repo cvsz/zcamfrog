@@ -174,6 +174,16 @@ public static class Strings
   public static string MsgAdminLaunchFailed => Manager.GetString("MsgAdminLaunchFailed", CultureInfo.CurrentUICulture) ?? "MsgAdminLaunchFailed";
   public static string ColPresence => Manager.GetString("ColPresence", CultureInfo.CurrentUICulture) ?? "ColPresence";
   public static string ColRoom => Manager.GetString("ColRoom", CultureInfo.CurrentUICulture) ?? "ColRoom";
+  public static string StateOffline => Manager.GetString("StateOffline", CultureInfo.CurrentUICulture) ?? "StateOffline";
+  public static string StateStarting => Manager.GetString("StateStarting", CultureInfo.CurrentUICulture) ?? "StateStarting";
+  public static string StateAwaitingLogin => Manager.GetString("StateAwaitingLogin", CultureInfo.CurrentUICulture) ?? "StateAwaitingLogin";
+  public static string StateIdle => Manager.GetString("StateIdle", CultureInfo.CurrentUICulture) ?? "StateIdle";
+  public static string StateRoomRequested => Manager.GetString("StateRoomRequested", CultureInfo.CurrentUICulture) ?? "StateRoomRequested";
+  public static string StateRoomNotObserved => Manager.GetString("StateRoomNotObserved", CultureInfo.CurrentUICulture) ?? "StateRoomNotObserved";
+  public static string StateOrphaned => Manager.GetString("StateOrphaned", CultureInfo.CurrentUICulture) ?? "StateOrphaned";
+  public static string StateUnknown => Manager.GetString("StateUnknown", CultureInfo.CurrentUICulture) ?? "StateUnknown";
+  public static string StateUntrackedClients => Manager.GetString("StateUntrackedClients", CultureInfo.CurrentUICulture) ?? "StateUntrackedClients";
+  public static string StateEvidenceLabel => Manager.GetString("StateEvidenceLabel", CultureInfo.CurrentUICulture) ?? "StateEvidenceLabel";
 }
 
 /// <summary>Formats resource templates. A helper (rather than inline string.Format) because resource

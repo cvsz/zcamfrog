@@ -92,7 +92,10 @@ Under `%LOCALAPPDATA%\CamfrogMultiID\`:
   `/terminate` on stop.
 - Auto-restart (opt-in, 3 per 10 min, then pauses with Error).
 - Search/filter, per-account details + launch preview, health dashboard
-  (presence, room, uptime, restarts, 30-event feed), status bar.
+  (account state, room, uptime, restarts, 30-event feed), status bar. Account
+  state is evidence-based (offline / starting / awaiting login / online /
+  room link sent / orphaned / unknown) and specified in
+  `docs/account-status.md`.
 - Log viewer (level filter, export, diagnostics bundle without secrets).
 - Backup/restore (traversal-safe) + scheduled auto-backups with pruning.
 - Password-age tracking with 90-day rotation notice.

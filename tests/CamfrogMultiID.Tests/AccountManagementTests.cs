@@ -289,30 +289,128 @@ public sealed class AccountManagementTests : IDisposable
   }
 
   [Fact]
-  public void BuildPresenceView_StatesAreHonest()
+  public void ResolveRuntimeStates_MatrixIsEvidenceBased()
   {
-    var offline = new CamfrogAccount { RoomUrl = "camfrog://join_room/?name=R" };
-    var offlineView = ProcessSessionService.BuildPresenceView(offline, new List<ProcessSessionService.LiveClient>(), false);
-    Assert.False(offlineView.Online);
-    Assert.Equal("Offline", offlineView.PresenceDisplay);
-    Assert.False(offlineView.JoinRequested);
+    const string room = "camfrog://join_room/?name=R";
+    static CamfrogAccount Acc(long id, int? pid, string roomUrl = "") =>
+        new() { Id = id, ProcessId = pid, RoomUrl = roomUrl, Username = "u" + id };
+    static ProcessSessionService.ClientProcessInfo Client(int pid, int ppid, string cmd = "", string title = "") =>
+        new(pid, ppid, cmd, DateTime.UtcNow, title);
 
-    var runningNoRoom = new CamfrogAccount();
-    var runningView = ProcessSessionService.BuildPresenceView(runningNoRoom, new List<ProcessSessionService.LiveClient>(), true);
-    Assert.True(runningView.Online);
-    Assert.False(runningView.JoinRequested);
+    // Evidence unavailable -> every account Unknown, never "Offline".
+    var noEvidence = ProcessSessionService.ResolveRuntimeStates(
+        new[] { Acc(1, 100), Acc(2, null) }, null, new HashSet<int> { 100 });
+    Assert.False(noEvidence.EvidenceAvailable);
+    Assert.All(noEvidence.Accounts, v => Assert.Equal(AccountRuntimeState.Unknown, v.State));
 
-    var withRoom = new CamfrogAccount { RoomUrl = "camfrog://join_room/?name=R" };
-    var live = new List<ProcessSessionService.LiveClient>
-        {
-            new(111, "client.exe --url=\"camfrog://join_room/?name=R\"", DateTime.UtcNow)
-        };
-    var joined = ProcessSessionService.BuildPresenceView(withRoom, live, true);
-    Assert.True(joined.JoinRequested);
-    Assert.Equal("R", joined.RoomName);
-    var unobserved = ProcessSessionService.BuildPresenceView(withRoom, new List<ProcessSessionService.LiveClient>(), true);
-    Assert.False(unobserved.JoinRequested);
-    Assert.Contains("not observed", unobserved.RoomDisplay, StringComparison.Ordinal);
+    var accounts = new[]
+    {
+        Acc(1, null),                       // never started
+        Acc(2, 200, room),                 // wrapper alive, client not yet spawned
+        Acc(3, 300),                       // client alive, no window
+        Acc(4, 400),                       // client alive with window, no room
+        Acc(5, 500, room),                 // client carries the room link
+        Acc(6, 600, room),                 // client alive but link absent
+        Acc(7, 700, room),                 // client outlived the wrapper
+        Acc(8, 800),                       // wrapper recorded but gone, no client
+    };
+    var clients = new List<ProcessSessionService.ClientProcessInfo>
+    {
+        Client(301, 300),                                    // 3: no window
+        Client(401, 400, title: "Camfrog"),                  // 4: window
+        Client(501, 500, $"client.exe --url=\"{room}\""),    // 5: link delivered
+        Client(601, 600, title: "Camfrog"),                  // 6: window but no link
+        Client(701, 700, title: "Camfrog"),                  // 7: wrapper dead
+    };
+    var live = new HashSet<int> { 100, 200, 300, 400, 500, 600 };
+    var snapshot = new ProcessSessionService.ClientProcessSnapshot(clients, BuildParents(clients));
+
+    var report = ProcessSessionService.ResolveRuntimeStates(accounts, snapshot, live);
+    Assert.True(report.EvidenceAvailable);
+    var byId = report.Accounts.ToDictionary(v => v.AccountId);
+    Assert.Equal(AccountRuntimeState.Offline, byId[1].State);
+    Assert.Equal(AccountRuntimeState.Starting, byId[2].State);
+    Assert.Equal(AccountRuntimeState.AwaitingLogin, byId[3].State);
+    Assert.Equal(AccountRuntimeState.Idle, byId[4].State);
+    Assert.Equal(AccountRuntimeState.RoomRequested, byId[5].State);
+    Assert.Equal("R", byId[5].RoomName);
+    Assert.Equal(AccountRuntimeState.RoomNotObserved, byId[6].State);
+    Assert.Equal(AccountRuntimeState.Orphaned, byId[7].State);
+    Assert.Equal(AccountRuntimeState.Offline, byId[8].State);
+    Assert.Empty(report.UntrackedClients);
+  }
+
+  private static Dictionary<int, int> BuildParents(IEnumerable<ProcessSessionService.ClientProcessInfo> clients)
+  {
+    var map = new Dictionary<int, int>();
+    foreach (var c in clients)
+      map[c.ProcessId] = c.ParentProcessId;
+    return map;
+  }
+
+  [Fact]
+  public void ResolveRuntimeStates_SameRoomAccountsDoNotStealEachOthersClient()
+  {
+    // The old logic matched any live client command line against the room
+    // URL, so two accounts in one room both looked joined. Attribution must
+    // follow the tracked wrapper PID instead.
+    const string room = "camfrog://join_room/?name=Shared";
+    var accounts = new[]
+    {
+        new CamfrogAccount { Id = 1, ProcessId = 100, RoomUrl = room },
+        new CamfrogAccount { Id = 2, ProcessId = 200, RoomUrl = room },
+    };
+    var clients = new List<ProcessSessionService.ClientProcessInfo>
+    {
+        new(901, 200, $"client.exe --url=\"{room}\"", DateTime.UtcNow, "Camfrog"),
+    };
+    var snapshot = new ProcessSessionService.ClientProcessSnapshot(clients, BuildParents(clients));
+    var report = ProcessSessionService.ResolveRuntimeStates(accounts, snapshot, new HashSet<int> { 100, 200 });
+    var byId = report.Accounts.ToDictionary(v => v.AccountId);
+    Assert.Equal(AccountRuntimeState.RoomRequested, byId[2].State);
+    Assert.Equal(AccountRuntimeState.Starting, byId[1].State);
+    Assert.Equal(new List<int> { 901 }, byId[2].ClientProcessIds);
+    Assert.Empty(byId[1].ClientProcessIds);
+  }
+
+  [Fact]
+  public void ResolveRuntimeStates_UntrackedClientIsReportedNotAssigned()
+  {
+    var accounts = new[] { new CamfrogAccount { Id = 1, ProcessId = null } };
+    var clients = new List<ProcessSessionService.ClientProcessInfo>
+    {
+        new(555, 1, "client.exe", DateTime.UtcNow, "Camfrog"), // parent is not a tracked PID
+    };
+    var snapshot = new ProcessSessionService.ClientProcessSnapshot(clients, BuildParents(clients));
+    var report = ProcessSessionService.ResolveRuntimeStates(accounts, snapshot, new HashSet<int>());
+    Assert.Equal(AccountRuntimeState.Offline, report.Accounts[0].State);
+    Assert.Equal(555, Assert.Single(report.UntrackedClients).ProcessId);
+  }
+
+  [Fact]
+  public void ResolveRuntimeStates_AncestorChainIsWalked()
+  {
+    // Wrapper -> helper -> client: the client is two hops down.
+    var accounts = new[] { new CamfrogAccount { Id = 1, ProcessId = 100 } };
+    var clients = new List<ProcessSessionService.ClientProcessInfo>
+    {
+        new(300, 200, string.Empty, DateTime.UtcNow, "Camfrog"),
+    };
+    // PID 200 is an intermediate helper, not a client: it is absent from the
+    // client list and only reachable through the parent map.
+    var parents = BuildParents(clients);
+    parents[200] = 100;
+    var snapshot = new ProcessSessionService.ClientProcessSnapshot(clients, parents);
+    var report = ProcessSessionService.ResolveRuntimeStates(accounts, snapshot, new HashSet<int> { 100 });
+    Assert.Equal(AccountRuntimeState.Idle, report.Accounts[0].State);
+    Assert.Equal(300, Assert.Single(report.Accounts[0].ClientProcessIds));
+  }
+
+  [Fact]
+  public void GetClientProcessSnapshot_UnsetExecutable_ReturnsNull()
+  {
+    Assert.Null(ProcessSessionService.GetClientProcessSnapshot(string.Empty));
+    Assert.Null(ProcessSessionService.GetClientProcessSnapshot("   "));
   }
 
   [Fact]

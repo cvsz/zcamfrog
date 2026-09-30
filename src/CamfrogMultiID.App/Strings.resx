@@ -515,4 +515,34 @@
   <data name="ColRoom" xml:space="preserve">
     <value>Room</value>
   </data>
+  <data name="StateOffline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="StateStarting" xml:space="preserve">
+    <value>Starting</value>
+  </data>
+  <data name="StateAwaitingLogin" xml:space="preserve">
+    <value>Awaiting login</value>
+  </data>
+  <data name="StateIdle" xml:space="preserve">
+    <value>Online (no room)</value>
+  </data>
+  <data name="StateRoomRequested" xml:space="preserve">
+    <value>Room link sent</value>
+  </data>
+  <data name="StateRoomNotObserved" xml:space="preserve">
+    <value>Room link not seen</value>
+  </data>
+  <data name="StateOrphaned" xml:space="preserve">
+    <value>Orphaned client</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="StateUntrackedClients" xml:space="preserve">
+    <value>{0} untracked client process(es) are running (started manually?). See docs/account-status.md.</value>
+  </data>
+  <data name="StateEvidenceLabel" xml:space="preserve">
+    <value>Evidence</value>
+  </data>
 </root>

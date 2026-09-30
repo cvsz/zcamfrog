@@ -2,6 +2,18 @@
 
 All notable changes to Camfrog Multi-ID Manager are documented here. Based on Keep a Changelog and Semantic Versioning.
 
+## [Unreleased]
+### Added
+- Evidence-based account state machine (`AccountRuntimeState`), specified in `docs/account-status.md`: offline, starting, awaiting login, online (no room), room link sent, room link not seen, orphaned client, unknown. The resolver is a pure function with a table-driven test matrix
+- Untracked-client banner: client processes belonging to no account are counted and surfaced instead of being silently ignored
+- Evidence line in the details pane for the selected account
+
+### Fixed
+- Room status no longer false-positives: attribution follows the tracked wrapper PID through process ancestry, so two accounts configured with the same room link no longer both report "joined". The previous code matched any live client command line against the room URL
+- Status no longer claims "Online" when the client is running but has no window (login pending), and surfaces orphaned clients whose wrapper died instead of reporting them as offline
+- Evidence read failures (WMI/COM/access denied) now fail closed to `Unknown` instead of reporting every account offline
+- One WMI sweep per refresh instead of one query per process
+
 ## [1.3.0] - 2026-09-25
 ### Added
 - Health dashboard (per-account running/error lines, 30-event feed)

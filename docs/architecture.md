@@ -19,7 +19,10 @@ Windows WPF desktop application (`.NET 8`, `net8.0-windows`, `win-x64` self-cont
 ### CamfrogMultiID.App (`src/CamfrogMultiID.App`)
 - WPF UI: `App.xaml`, `MainWindow`, `AccountWindow`, `SettingsWindow`, `app.manifest` (`asInvoker`).
 - `App.xaml.cs`: single-instance mutex (`Local\CamfrogMultiID.Manager`), guarded `OnStartup` (no static initialization before `OnStartup`), `Db.Initialize`, emergency log at `startup-error.log`, dispatcher/AppDomain/unobserved-task diagnostics, clean `OnExit` mutex release.
-- `MainWindow`: polling reconciler (`DispatcherTimer` 2s) calling `IsTrackedProcessAlive`, DB/UI refresh non-reentrant, log viewer tolerant to I/O failures.
+- `MainWindow`: polling reconciler (`DispatcherTimer` 2s) calling `IsTrackedProcessAlive`, DB/UI refresh non-reentrant, log viewer tolerant to I/O
+  failures. Per-account status is resolved by `ResolveRuntimeStates` from one
+  WMI sweep plus wrapper liveness; the state list and its evidence rules live
+  in `docs/account-status.md` (single source of truth, table-tested).
 - `AccountWindow`: validation (username required, password required, case-insensitive duplicate), profile/secret creation with rollback on DB failure, DPAPI save before DB insert.
 - `SettingsWindow`: executable browse, existence validation, argument template support (`{username}`, `{profile}` only).
 
