@@ -142,27 +142,27 @@ public sealed class AccountManagementTests : IDisposable
     Assert.NotEmpty(unclosed);
   }
 
-    [Fact]
-    public void NormalizeRoomUrl_RejectsHostileInputs()
-    {
-        Assert.Equal("CAMFROG://join_room/?name=X", ProcessSessionService.NormalizeRoomUrl("CAMFROG://join_room/?name=X"));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=My Room"));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=a\rb"));
-        // Quotes and backslashes are accepted: the canonical Quote() escapes
-        // them inside the argument, verified via the preview.
-        var tricky = ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=a\"b\\c");
-        var preview = ProcessSessionService.PreviewCommandLine(
-            @"C:\c.exe", "", new CamfrogAccount { Username = "u", ProfileDirectory = "p", RoomUrl = tricky });
-        Assert.Contains("\\\"", preview, StringComparison.Ordinal);
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://x/" + new string('a', 600)));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("shell:open"));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("powershell:-c"));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("cmd:/c"));
-        Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("file:///c:/x"));
-    }
+  [Fact]
+  public void NormalizeRoomUrl_RejectsHostileInputs()
+  {
+    Assert.Equal("CAMFROG://join_room/?name=X", ProcessSessionService.NormalizeRoomUrl("CAMFROG://join_room/?name=X"));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=My Room"));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=a\rb"));
+    // Quotes and backslashes are accepted: the canonical Quote() escapes
+    // them inside the argument, verified via the preview.
+    var tricky = ProcessSessionService.NormalizeRoomUrl("camfrog://join_room/?name=a\"b\\c");
+    var preview = ProcessSessionService.PreviewCommandLine(
+        @"C:\c.exe", "", new CamfrogAccount { Username = "u", ProfileDirectory = "p", RoomUrl = tricky });
+    Assert.Contains("\\\"", preview, StringComparison.Ordinal);
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("camfrog://x/" + new string('a', 600)));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("shell:open"));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("powershell:-c"));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("cmd:/c"));
+    Assert.Throws<InvalidOperationException>(() => ProcessSessionService.NormalizeRoomUrl("file:///c:/x"));
+  }
 
-    [Fact]
-    public void NormalizeRoomUrl_AcceptsCamfrogScheme()
+  [Fact]
+  public void NormalizeRoomUrl_AcceptsCamfrogScheme()
   {
     Assert.Equal("camfrog://room/Test", ProcessSessionService.NormalizeRoomUrl("  camfrog://room/Test  "));
     Assert.Throws<ArgumentException>(() => ProcessSessionService.NormalizeRoomUrl("   "));
@@ -532,20 +532,20 @@ public sealed class AccountManagementTests : IDisposable
     Assert.False(policy.ShouldRestart(99, now.AddSeconds(8)));
   }
 
-    [Fact]
-    public void RestartPolicy_ToleratesClockSkew()
-    {
-        var policy = new RestartPolicy();
-        var now = DateTime.UtcNow;
-        Assert.True(policy.ShouldRestart(30, now));
-        // Querying with an earlier clock still sees the attempt in-window.
-        Assert.True(policy.ShouldRestart(30, now.AddHours(-1)));
-        Assert.True(policy.ShouldRestart(30, now));
-        Assert.False(policy.ShouldRestart(30, now));
-    }
+  [Fact]
+  public void RestartPolicy_ToleratesClockSkew()
+  {
+    var policy = new RestartPolicy();
+    var now = DateTime.UtcNow;
+    Assert.True(policy.ShouldRestart(30, now));
+    // Querying with an earlier clock still sees the attempt in-window.
+    Assert.True(policy.ShouldRestart(30, now.AddHours(-1)));
+    Assert.True(policy.ShouldRestart(30, now));
+    Assert.False(policy.ShouldRestart(30, now));
+  }
 
-    [Fact]
-    public void RestartPolicy_TracksAccountsSeparately()
+  [Fact]
+  public void RestartPolicy_TracksAccountsSeparately()
   {
     var policy = new RestartPolicy();
     var now = DateTime.UtcNow;

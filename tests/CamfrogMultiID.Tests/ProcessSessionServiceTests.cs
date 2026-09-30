@@ -97,6 +97,130 @@ public sealed class ProcessSessionServiceTests : IDisposable
   }
 
   [Fact]
+  public void IsDeletionSafe_CleanlyStoppedAccount_AllowsDelete()
+  {
+    var account = new CamfrogAccount
+    {
+      Status = "Stopped",
+      ProcessId = null,
+      LastError = string.Empty
+    };
+    Assert.True(ProcessSessionService.IsDeletionSafe(account, out var reason));
+    Assert.Null(reason);
+  }
+
+  [Fact]
+  public void IsDeletionSafe_NotStopped_Refuses()
+  {
+    var account = new CamfrogAccount
+    {
+      Status = "Running",
+      ProcessId = null,
+      LastError = string.Empty
+    };
+    Assert.False(ProcessSessionService.IsDeletionSafe(account, out var reason));
+    Assert.Contains("Running", reason);
+  }
+
+  [Fact]
+  public void IsDeletionSafe_TrackedPid_Refuses()
+  {
+    var account = new CamfrogAccount
+    {
+      Status = "Stopped",
+      ProcessId = 4242,
+      LastError = string.Empty
+    };
+    Assert.False(ProcessSessionService.IsDeletionSafe(account, out var reason));
+    Assert.Contains("still tracked", reason);
+  }
+
+  [Theory]
+  [InlineData("Tracked process no longer matches.")]
+  [InlineData("Sandboxie did not confirm that the sandbox terminated.")]
+  [InlineData("Process exited.")]
+  public void IsDeletionSafe_RecordedError_RefusesEvenWhenStopped(string error)
+  {
+    // "Stopped" with a recorded reason means the manager could not confirm the
+    // client is gone, so the profile must not be deleted.
+    var account = new CamfrogAccount
+    {
+      Status = "Stopped",
+      ProcessId = null,
+      LastError = error
+    };
+    Assert.False(ProcessSessionService.IsDeletionSafe(account, out var reason));
+    Assert.Equal(error, reason);
+  }
+
+  [Fact]
+  public void IsDeletionSafe_NullAccount_Refuses()
+  {
+    Assert.False(ProcessSessionService.IsDeletionSafe(null, out var reason));
+    Assert.NotNull(reason);
+  }
+
+  [Fact]
+  public void Stop_TrackedProcessMismatch_MarksStoppedWithError()
+  {
+    // A PID that no longer matches must never be terminated, and the account
+    // must keep an error so the delete gate refuses.
+    var current = Process.GetCurrentProcess();
+    var account = new CamfrogAccount
+    {
+      DisplayName = "mismatch",
+      Username = "mm_" + Guid.NewGuid().ToString("N"),
+      PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "mm"),
+      Enabled = true,
+      Status = "Running",
+      ProcessId = current.Id,
+      StartedAtUtc = current.StartTime.ToUniversalTime(),
+      ProcessExecutablePath = @"C:\nonexistent\fake.exe"
+    };
+    account.Id = _db.Add(account);
+
+    _svc.Stop(account);
+
+    var after = _db.GetById(account.Id)!;
+    Assert.Equal("Stopped", after.Status);
+    Assert.Equal("Tracked process no longer matches.", after.LastError);
+    Assert.False(ProcessSessionService.IsDeletionSafe(after, out _));
+    // The current process is still alive: Stop must not have killed it.
+    Assert.False(current.HasExited);
+  }
+
+  [Fact]
+  public void Stop_CorruptExecutablePath_IsMismatchNotAlreadyGone()
+  {
+    // A malformed path in the database must read as an identity mismatch. If
+    // it escaped as an ArgumentException, Stop would record a clean "Stopped"
+    // with no error and the delete gate would allow removing a live profile.
+    var current = Process.GetCurrentProcess();
+    var account = new CamfrogAccount
+    {
+      DisplayName = "corruptpath",
+      Username = "cp_" + Guid.NewGuid().ToString("N"),
+      PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "cp"),
+      Enabled = true,
+      Status = "Running",
+      ProcessId = current.Id,
+      StartedAtUtc = current.StartTime.ToUniversalTime(),
+      ProcessExecutablePath = "\0bad|path"
+    };
+    account.Id = _db.Add(account);
+
+    _svc.Stop(account);
+
+    var after = _db.GetById(account.Id)!;
+    Assert.Equal("Stopped", after.Status);
+    Assert.Equal("Tracked process no longer matches.", after.LastError);
+    Assert.False(ProcessSessionService.IsDeletionSafe(after, out _));
+    Assert.False(current.HasExited);
+  }
+
+  [Fact]
   public void StartStop_WithRealProcess_Roundtrips()
   {
     var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
@@ -105,7 +229,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
       DisplayName = "live",
       Username = "live_" + Guid.NewGuid().ToString("N"),
       PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
-      ProfileDirectory = Path.Combine(_tempRoot, "p_live"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "live"),
       Enabled = true
     };
     acc.Id = _db.Add(acc);
@@ -150,36 +274,36 @@ public sealed class ProcessSessionServiceTests : IDisposable
     Assert.DoesNotContain(excluded, f => f.ProcessId == self.Id);
   }
 
-    [Fact]
-    public void IsTrackedProcessAlive_ExitedProcess_ReportsExited()
-    {
-        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
-        var acc = new CamfrogAccount
-        {
-            DisplayName = "shortlived",
-            Username = "shortlived_" + Guid.NewGuid().ToString("N"),
-            PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
-            ProfileDirectory = Path.Combine(_tempRoot, "p_short"),
-            Enabled = true
-        };
-        acc.Id = _db.Add(acc);
-        var settings = new AppSettings { ClientExecutable = cmd, ClientArgumentsTemplate = "/c exit 0" };
-        using var process = _svc.Start(acc, settings);
-        Assert.True(process.WaitForExit(10000));
-        var tracked = _db.GetById(acc.Id)!;
-        Assert.False(ProcessSessionService.IsTrackedProcessAlive(tracked, out var reason));
-        // Either the exit was observed or the PID was already reaped.
-        Assert.True(
-            reason is not null && (reason.Contains("xited", StringComparison.OrdinalIgnoreCase) || reason.Contains("no longer exists", StringComparison.OrdinalIgnoreCase)),
-            $"Unexpected reason: {reason}");
-        _svc.Stop(tracked);
-        Assert.Equal("Stopped", _db.GetById(acc.Id)!.Status);
-    }
-
-    [Fact]
-    public void Start_MissingExecutable_Throws()
+  [Fact]
+  public void IsTrackedProcessAlive_ExitedProcess_ReportsExited()
   {
-    var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_tempRoot, "p1") };
+    var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+    var acc = new CamfrogAccount
+    {
+      DisplayName = "shortlived",
+      Username = "shortlived_" + Guid.NewGuid().ToString("N"),
+      PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "short"),
+      Enabled = true
+    };
+    acc.Id = _db.Add(acc);
+    var settings = new AppSettings { ClientExecutable = cmd, ClientArgumentsTemplate = "/c exit 0" };
+    using var process = _svc.Start(acc, settings);
+    Assert.True(process.WaitForExit(10000));
+    var tracked = _db.GetById(acc.Id)!;
+    Assert.False(ProcessSessionService.IsTrackedProcessAlive(tracked, out var reason));
+    // Either the exit was observed or the PID was already reaped.
+    Assert.True(
+        reason is not null && (reason.Contains("xited", StringComparison.OrdinalIgnoreCase) || reason.Contains("no longer exists", StringComparison.OrdinalIgnoreCase)),
+        $"Unexpected reason: {reason}");
+    _svc.Stop(tracked);
+    Assert.Equal("Stopped", _db.GetById(acc.Id)!.Status);
+  }
+
+  [Fact]
+  public void Start_MissingExecutable_Throws()
+  {
+    var acc = new CamfrogAccount { Id = 1, DisplayName = "test", Username = "u", ProfileDirectory = Path.Combine(_paths.Profiles, "p1") };
     var settings = new AppSettings { ClientExecutable = "", ClientArgumentsTemplate = "" };
     Assert.Throws<InvalidOperationException>(() => _svc.Start(acc, settings));
   }
@@ -187,7 +311,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
   [Fact]
   public void Start_SandboxieWithoutStartExe_Throws()
   {
-    var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_tempRoot, "p_sbx") };
+    var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_paths.Profiles, "sbx") };
     var settings = new AppSettings
     {
       ClientExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
@@ -203,7 +327,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
     var acc = new CamfrogAccount
     {
       Id = 1,
-      ProfileDirectory = Path.Combine(_tempRoot, "p_room"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "room"),
       RoomUrl = "https://example.com/not-camfrog"
     };
     var settings = new AppSettings
@@ -216,9 +340,53 @@ public sealed class ProcessSessionServiceTests : IDisposable
   [Fact]
   public void Start_NonExistentFile_Throws()
   {
-    var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_tempRoot, "p2") };
+    var acc = new CamfrogAccount { Id = 1, ProfileDirectory = Path.Combine(_paths.Profiles, "p2") };
     var settings = new AppSettings { ClientExecutable = Path.Combine(_tempRoot, "nonexistent.exe") };
     Assert.Throws<FileNotFoundException>(() => _svc.Start(acc, settings));
+  }
+
+  [Fact]
+  public void Stop_RefusesProcessWhenExecutableIdentityIsUnknown()
+  {
+    // Fail closed: if the recorded executable cannot be matched, the PID
+    // alone is not proof of identity and must never be killed.
+    using var current = Process.GetCurrentProcess();
+    var id = _db.Add(new CamfrogAccount
+    {
+      DisplayName = "unknownpath",
+      Username = "unknownpath_" + Guid.NewGuid().ToString("N"),
+      PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "unknownpath"),
+      Enabled = true
+    });
+    // Empty executable path: the only usable signal is PID + start time.
+    _db.UpdateRuntime(id, "Running", current.Id, current.StartTime.ToUniversalTime(), "", string.Empty);
+    var acc = _db.GetById(id)!;
+    Assert.False(ProcessSessionService.IsTrackedProcessAlive(acc, out _));
+    _svc.Stop(acc);
+    Assert.False(current.HasExited);
+  }
+
+  [Fact]
+  public void Stop_RefusesProcessWhenStartTimeDiffers()
+  {
+    // PID matches, start time does not: a recycled PID must be refused.
+    using var current = Process.GetCurrentProcess();
+    var id = _db.Add(new CamfrogAccount
+    {
+      DisplayName = "stale",
+      Username = "stale_" + Guid.NewGuid().ToString("N"),
+      PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "stale"),
+      Enabled = true
+    });
+    _db.UpdateRuntime(id, "Running", current.Id, current.StartTime.ToUniversalTime().AddHours(-3), "", string.Empty);
+    var acc = _db.GetById(id)!;
+    Assert.False(ProcessSessionService.IsTrackedProcessAlive(acc, out var reason));
+    _svc.Stop(acc);
+    Assert.False(current.HasExited);
+    Assert.Contains("no longer matches", _db.GetById(id)!.LastError, StringComparison.OrdinalIgnoreCase);
+    Assert.NotNull(reason);
   }
 
   [Fact]
@@ -230,7 +398,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
       DisplayName = "foreign",
       Username = "foreign_" + Guid.NewGuid().ToString("N"),
       PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
-      ProfileDirectory = Path.Combine(_tempRoot, "p_foreign"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "foreign"),
       Enabled = true
     });
     // Add() persists identity columns only; runtime state needs UpdateRuntime.
@@ -253,7 +421,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
       DisplayName = "nopid",
       Username = "nopid_user_" + Guid.NewGuid().ToString("N"),
       PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
-      ProfileDirectory = Path.Combine(_tempRoot, "p_nopid"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "nopid"),
       Enabled = true
     });
     var acc = _db.GetAccounts().Single(a => a.Id == id);
@@ -272,7 +440,7 @@ public sealed class ProcessSessionServiceTests : IDisposable
       DisplayName = "invalid",
       Username = "invalid_" + Guid.NewGuid().ToString("N"),
       PasswordSecretName = "s_" + Guid.NewGuid().ToString("N"),
-      ProfileDirectory = Path.Combine(_tempRoot, "p_invalid"),
+      ProfileDirectory = Path.Combine(_paths.Profiles, "invalid"),
       Enabled = true
     });
     var acc = _db.GetAccounts().Single(a => a.Id == id);

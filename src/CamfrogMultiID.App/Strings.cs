@@ -184,6 +184,7 @@ public static class Strings
   public static string StateUnknown => Manager.GetString("StateUnknown", CultureInfo.CurrentUICulture) ?? "StateUnknown";
   public static string StateUntrackedClients => Manager.GetString("StateUntrackedClients", CultureInfo.CurrentUICulture) ?? "StateUntrackedClients";
   public static string StateEvidenceLabel => Manager.GetString("StateEvidenceLabel", CultureInfo.CurrentUICulture) ?? "StateEvidenceLabel";
+  public static string MsgStopBeforeDelete => Manager.GetString("MsgStopBeforeDelete", CultureInfo.CurrentUICulture) ?? "MsgStopBeforeDelete";
 }
 
 /// <summary>Formats resource templates. A helper (rather than inline string.Format) because resource

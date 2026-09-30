@@ -20,8 +20,12 @@ dotnet build CamfrogMultiID.sln -c Debug --no-restore
 dotnet build CamfrogMultiID.sln -c Release --no-restore
 # fallback if solution restore was incomplete:
 dotnet build src/CamfrogMultiID.App/CamfrogMultiID.App.csproj -c Release --no-restore
+dotnet format CamfrogMultiID.sln --verify-no-changes --no-restore
 dotnet test CamfrogMultiID.sln -c Release --no-build --verbosity normal
 ```
+CI runs the same gates. `dotnet format` is enforced against `.editorconfig`
+(LF endings, 2-space indent), so a mixed-ending or over-indented file fails
+the build rather than drifting.
 
 ## Publish (production artifact)
 ```powershell
@@ -30,6 +34,23 @@ dotnet test CamfrogMultiID.sln -c Release --no-build --verbosity normal
 .\build-release.cmd
 ```
 Output: `src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/CamfrogMultiID.exe` (self-contained, single-file).
+
+`build-release.ps1` ends by running `scripts/verify-publish.ps1`, which
+requires the publish directory to contain exactly the executable and its three
+symbol files. An unexpected loose dependency, or a missing file, fails the
+build. Run the same check by hand with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-publish.ps1 `
+    -PublishDir src\CamfrogMultiID.App\bin\Release\net8.0-windows\win-x64\publish
+```
+
+## Supply chain artifacts
+CI generates a CycloneDX SBOM (`artifacts/app.bom.xml`) with the pinned
+`cyclonedx` 6.2.0 tool and a transitive package manifest
+(`artifacts/packages.json` via `dotnet list package`), then uploads both as the
+`sbom` artifact. The step fails if the SBOM is missing, unparseable, or has no
+components, so a silently empty bill of materials cannot be published.
 
 ## Diagnostic run
 ```powershell

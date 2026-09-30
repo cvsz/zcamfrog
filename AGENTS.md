@@ -43,7 +43,20 @@ about what the third-party Camfrog client can and cannot do.
 
 ## Invariants (fail closed)
 - Never terminate a process whose PID/start-time/executable identity does
-  not match the tracked account.
+  not match the tracked account. An unreadable identity signal is a
+  mismatch, never a pass.
+- Never delete an account profile unless the account is stopped, has no
+  tracked PID, and carries no recorded error
+  (`ProcessSessionService.IsDeletionSafe`). Unconfirmed Sandboxie
+  termination must leave the account in `Error`, not `Stopped`.
+- Never migrate a database whose `PRAGMA user_version` is newer than
+  `DatabaseService.SchemaVersion`; refuse instead of stamping an older
+  version. Schema changes run in a single transaction.
+- Treat the database as a trust boundary: validate secret names, contain
+  profile directories under the managed root, and accept `camfrog:` room
+  URLs only, regardless of what the UI already checked.
+- Backup restore is all-or-nothing with rollback; a failed restore must not
+  leave a partially replaced database beside stale secrets.
 - Stored secrets never enter logs, command lines, exception messages,
   or the database.
 - A corrupt database row or failed refresh must degrade (log + keep old

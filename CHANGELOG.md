@@ -4,15 +4,31 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 
 ## [Unreleased]
 ### Added
+- `scripts/verify-publish.ps1`: exact allow-list for the self-contained single-file publish (unexpected or missing files fail the build), wired into both CI and `build-release.ps1`
+- CI: `dotnet format --verify-no-changes` gate, CycloneDX SBOM (pinned `cyclonedx` 6.2.0) plus `dotnet list package` manifest, uploaded as an artifact
 - Evidence-based account state machine (`AccountRuntimeState`), specified in `docs/account-status.md`: offline, starting, awaiting login, online (no room), room link sent, room link not seen, orphaned client, unknown. The resolver is a pure function with a table-driven test matrix
 - Untracked-client banner: client processes belonging to no account are counted and surfaced instead of being silently ignored
 - Evidence line in the details pane for the selected account
+
+### Security
+- Backup restore is now all-or-nothing: entries are staged, existing files are copied aside, and any failure rolls the whole restore back. A failed restore no longer leaves a new database beside old credentials
+- Zip-bomb limits on restore: at most 4096 entries, 64 MiB per entry, 512 MiB total uncompressed
+- `CredentialService` validates secret names and re-checks path containment, so a name like `..\..\evil` can no longer read, overwrite or delete files outside the secrets directory
+- `DatabaseService.Add` validates the secret name, requires the profile directory to live under the managed profiles root, and rejects non-`camfrog:` room URLs. The database is a trust boundary, not just a UI convenience
+- `MatchesTrackedProcess` fails closed: a missing executable path or an unreadable start time/executable is a mismatch, never a pass, so a permission error cannot let Stop kill a process that merely reuses the tracked PID
+- Deleting an account is refused unless it is stopped with no tracked PID and no recorded error. Sandboxie termination that cannot be confirmed now puts the account in `Error` instead of `Stopped`, so a running box is never orphaned by a profile deletion
+- A database written by a newer schema version is refused instead of being stamped with an older version; the whole migration runs in one transaction
 
 ### Fixed
 - Room status no longer false-positives: attribution follows the tracked wrapper PID through process ancestry, so two accounts configured with the same room link no longer both report "joined". The previous code matched any live client command line against the room URL
 - Status no longer claims "Online" when the client is running but has no window (login pending), and surfaces orphaned clients whose wrapper died instead of reporting them as offline
 - Evidence read failures (WMI/COM/access denied) now fail closed to `Unknown` instead of reporting every account offline
 - One WMI sweep per refresh instead of one query per process
+- Stale `camfrog.db-wal`/`camfrog.db-shm` sidecars are removed when a restore replaces the database
+
+### Changed
+- Source now complies with the repository `.editorconfig` (LF, 2-space indent), enforced by the new format gate
+- `docs/sandboxie-template.ini` corrected against the code: the box-name mapping table documented examples the sanitizer never produces, the stop sequence ignored the unconfirmed-box case, and placeholder substitution was described both as automatic and as never happening
 
 ## [1.3.0] - 2026-09-25
 ### Added
@@ -34,9 +50,10 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 ### Changed
 - `ABOUT.md`, `GOVERNANCE.md`, `CONTRIBUTING.md`, `.env.example`, `CODEOWNERS` rewritten from template-generic to project-specific; unused `FUNDING.yml` removed
 
-## [Unreleased]
+## [1.0.0] - 2026-09-20
+First tagged release. Published via the release workflow with `CamfrogMultiID-v1.0.0-win-x64.zip` + `.sha256` and build provenance attestation.
+
 ### Added
-- Merged `security/code-scanning-hardening`: immutable SHA-pinned Actions (all 6 verified against annotated tags), fail-closed CI/Release builds (fallback removed), Zip Slip leaf-enforcement + adversarial backup tests
 - Deps: `System.Management` + `System.ServiceProcess.ServiceController` 8.0.0→10.0.12 (verified `net8.0-windows`, 102/102)
 - Online/offline + room dashboard: Presence/Room grid columns, honest join evidence (live client command lines scanned for the room link; server-side membership correctly reported as unobservable), room name parsing
 - Reviewed co-agent work (domain validation, schema versioning, ACL reporting, adversarial tests); fixed its `Stop_RefusesLiveForeignProcess` test, which set runtime state on the transient object instead of via `UpdateRuntime` and therefore proved nothing
@@ -89,6 +106,3 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 
 ### Security
 - CodeQL `security-extended` for csharp, dependency-review enforced, DPAPI `CurrentUser` unchanged, process identity validation unchanged
-
-## [1.0.0] - 2026-09-20
-First tagged release. Published via the release workflow with `CamfrogMultiID-v1.0.0-win-x64.zip` + `.sha256` and build provenance attestation.

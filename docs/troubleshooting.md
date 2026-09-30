@@ -128,3 +128,37 @@ markup compilation. It must never be committed.
 
 Fix: it is covered by `*_wpftmp.csproj` in `.gitignore`. If one was
 staged, unstage and delete it.
+
+## 9. "The database schema is version N, but this build only understands version 4"
+
+Symptom: the manager shows a startup error and exits with code -1, naming a
+schema version higher than `DatabaseService.SchemaVersion`.
+
+Root cause: `%LOCALAPPDATA%\CamfrogMultiID\camfrog.db` was written by a newer
+build. The older build refuses to open it on purpose. Running its migrations
+against a newer schema could drop columns the newer build depends on, and
+stamping the older version number over the file would make the damage
+permanent.
+
+Fix: install the newer build, or restore a backup taken with a matching
+version (Settings > Restore). Do not edit `PRAGMA user_version` by hand unless
+you have confirmed the schema really is compatible. The version marker is left
+untouched when the refusal happens, so the newer build still opens the file.
+
+## 10. Delete refuses with "A process is still tracked for this account"
+
+Symptom: deleting an account is blocked and the message names a tracked
+process, a non-`Stopped` status, or a recorded error.
+
+Root cause: the delete guard is fail-closed by design. An account is only
+deletable when it is stopped, has no tracked PID, and has no recorded error.
+A `Stopped` row that still carries an error means the manager could not
+confirm the client is gone, for example because Sandboxie did not confirm the
+box terminated or the tracked PID no longer matched.
+
+Fix: stop the account from the dashboard and watch the status line. If it
+settles on `Error`, read the message in the details pane: restart the client
+once to re-establish tracking, or stop the box manually with
+`Start.exe /Box:<name> /terminate`. Deleting the profile while a box is still
+running would leave an unmanaged Camfrog instance, so the guard stays closed
+until the evidence says the client is gone.

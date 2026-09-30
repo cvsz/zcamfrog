@@ -545,4 +545,7 @@
   <data name="StateEvidenceLabel" xml:space="preserve">
     <value>Evidence</value>
   </data>
+  <data name="MsgStopBeforeDelete" xml:space="preserve">
+    <value>Account '{0}' is still running, so it was not deleted.{0}{1}Stop it first, then delete. This keeps a running sandbox from being orphaned with no tracking row.</value>
+  </data>
 </root>

@@ -56,6 +56,26 @@ jobs:
         run: |
           ruby -e 'require "yaml"; Dir.glob(".github/**/*.{yml,yaml}").each { |f| YAML.load_file(f); puts "ok #{f}" }'
 
+      - name: Marker scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fails if any production source carries an unfinished-work marker.
+          # Docs are not scanned: several of them define or explain the
+          # patterns themselves (AGENTS.md, CHANGELOG.md, this workflow,
+          # Makefile, docs/troubleshooting.md,
+          # docs/META_MASTER_ENGINEERING_PROMPT.md).
+          hits="$(grep -rnE 'TODO|FIXME|XXX|HACK|NotImplementedException' \
+            --include='*.cs' --include='*.xaml' --include='*.ps1' --include='*.cmd' \
+            --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git \
+            src scripts tests || true)"
+          if [ -n "$hits" ]; then
+            echo 'Marker scan found unfinished production code:'
+            echo "$hits"
+            exit 1
+          fi
+          echo 'marker scan clean'
+
   build:
     runs-on: windows-latest
     needs: repository-baseline
@@ -92,9 +112,35 @@ jobs:
         shell: pwsh
         run: dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
 
+      - name: Verify formatting (.editorconfig)
+        shell: pwsh
+        run: dotnet format CamfrogMultiID.sln --verify-no-changes --no-restore --verbosity minimal
+
       - name: Test
         shell: pwsh
         run: dotnet test CamfrogMultiID.sln -c Release --no-build --verbosity normal
+
+      - name: Generate SBOM and package manifest
+        shell: pwsh
+        run: |
+          $out = "artifacts"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          # The tool is pinned so the SBOM format cannot drift silently.
+          dotnet tool install --global cyclonedx --version 6.2.0
+          dotnet CycloneDX CamfrogMultiID.sln `
+            --output $out `
+            --filename app.bom.xml `
+            --recursive `
+            --exclude-test-projects `
+            --exclude-dev
+          if (-not (Test-Path -LiteralPath "$out\app.bom.xml")) { throw "SBOM was not generated" }
+          # Fail the build if the document is not parseable XML.
+          [xml]$bom = Get-Content "$out\app.bom.xml" -Raw
+          $components = @($bom.bom.components.component)
+          Write-Host "SBOM components: $($components.Count)"
+          if ($components.Count -eq 0) { throw "SBOM contains no components" }
+          dotnet list CamfrogMultiID.sln package --include-transitive --format json > "$out\packages.json"
+          Get-ChildItem $out | Format-Table Name,Length
 
       - name: Publish self-contained win-x64
         shell: pwsh
@@ -106,9 +152,20 @@ jobs:
           Get-ChildItem "src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish" | Format-Table Name,Length
           (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash | Out-Host
 
+      - name: Verify publish allow-list
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-publish.ps1 -PublishDir "src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish"
+
       - name: Upload publish artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: CamfrogMultiID-win-x64
           path: src/CamfrogMultiID.App/bin/Release/net8.0-windows/win-x64/publish/
+          retention-days: 14
+
+      - name: Upload SBOM and package manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: artifacts/
           retention-days: 14

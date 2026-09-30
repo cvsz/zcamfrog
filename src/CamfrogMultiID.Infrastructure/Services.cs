@@ -98,7 +98,25 @@ public sealed class DatabaseService
     lock (_gate)
     {
       using var connection = Open();
+
+      // Fail closed on a database written by a newer build. Silently running
+      // older migrations against it could drop columns the new build relies
+      // on, and stamping our own version over it makes the damage permanent.
+      using var probe = connection.CreateCommand();
+      probe.CommandText = "PRAGMA user_version;";
+      var existing = Convert.ToInt32(
+          probe.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+      if (existing > SchemaVersion)
+      {
+        throw new NotSupportedException(
+            $"The database schema is version {existing}, but this build only understands version {SchemaVersion}. Upgrade the manager or restore a matching backup.");
+      }
+
+      // One transaction for the whole migration: a failure part-way through
+      // leaves the database at its original version instead of half-migrated.
+      using var transaction = connection.BeginTransaction();
       using var command = connection.CreateCommand();
+      command.Transaction = transaction;
       command.CommandText = """
                 CREATE TABLE IF NOT EXISTS accounts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,19 +145,28 @@ public sealed class DatabaseService
       command.ExecuteNonQuery();
 
       // Ordered, idempotent migrations. Bump SchemaVersion when adding one.
-      EnsureColumn(connection, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
-      EnsureColumn(connection, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
-      EnsureColumn(connection, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
-      EnsureColumn(connection, "accounts", "password_changed_utc", "TEXT NOT NULL DEFAULT ''");
+      EnsureColumn(connection, transaction, "accounts", "process_executable_path", "TEXT NOT NULL DEFAULT ''");
+      EnsureColumn(connection, transaction, "accounts", "room_url", "TEXT NOT NULL DEFAULT ''");
+      EnsureColumn(connection, transaction, "accounts", "auto_restart", "INTEGER NOT NULL DEFAULT 0");
+      EnsureColumn(connection, transaction, "accounts", "password_changed_utc", "TEXT NOT NULL DEFAULT ''");
       using var version = connection.CreateCommand();
+      version.Transaction = transaction;
       version.CommandText = $"PRAGMA user_version = {SchemaVersion};";
       version.ExecuteNonQuery();
+
+      transaction.Commit();
     }
   }
 
-  private static void EnsureColumn(SqliteConnection connection, string table, string column, string definition)
+  private static void EnsureColumn(
+      SqliteConnection connection,
+      SqliteTransaction transaction,
+      string table,
+      string column,
+      string definition)
   {
     using var check = connection.CreateCommand();
+    check.Transaction = transaction;
     check.CommandText = $"PRAGMA table_info({table});";
     using var reader = check.ExecuteReader();
     while (reader.Read())
@@ -149,6 +176,7 @@ public sealed class DatabaseService
     }
 
     using var alter = connection.CreateCommand();
+    alter.Transaction = transaction;
     alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
     alter.ExecuteNonQuery();
   }
@@ -294,6 +322,30 @@ public sealed class DatabaseService
     return clean;
   }
 
+  /// <summary>
+  /// Requires a profile directory inside the managed profiles root. The
+  /// client is launched with this path as its working directory, so an
+  /// unchecked value would let the client create or read directories
+  /// anywhere the user can write.
+  /// </summary>
+  private string ValidateProfileDirectory(string profileDirectory)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(profileDirectory);
+    string full;
+    try
+    {
+      full = Path.GetFullPath(profileDirectory);
+    }
+    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+    {
+      throw new ArgumentException("Profile directory is not a valid path.", nameof(profileDirectory));
+    }
+    var root = Path.GetFullPath(_paths.Profiles);
+    if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+      throw new ArgumentException("Profile directory must be inside the managed profiles folder.", nameof(profileDirectory));
+    return full;
+  }
+
   public void SetRoomUrl(long id, string roomUrl)
   {
     ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
@@ -392,8 +444,14 @@ public sealed class DatabaseService
     ArgumentNullException.ThrowIfNull(account);
     account.DisplayName = ValidateAccountField(account.DisplayName, nameof(account.DisplayName));
     account.Username = ValidateAccountField(account.Username, nameof(account.Username));
-    ArgumentException.ThrowIfNullOrWhiteSpace(account.PasswordSecretName);
-    ArgumentException.ThrowIfNullOrWhiteSpace(account.ProfileDirectory);
+    // The UI validates these too, but the database is the trust boundary:
+    // never let an unvalidated room URL, secret name, or profile path reach
+    // disk. See docs/architecture.md.
+    CredentialService.ValidateSecretName(account.PasswordSecretName);
+    account.ProfileDirectory = ValidateProfileDirectory(account.ProfileDirectory);
+    account.RoomUrl = string.IsNullOrWhiteSpace(account.RoomUrl)
+        ? string.Empty
+        : ProcessSessionService.NormalizeRoomUrl(account.RoomUrl);
     lock (_gate)
     {
       using var connection = Open();
@@ -515,11 +573,48 @@ public sealed class CredentialService
   private readonly AppPaths _paths;
   public CredentialService(AppPaths paths) => _paths = paths;
 
-  private string SecretPath(string name) => Path.Combine(_paths.Secrets, name + ".bin");
+  /// <summary>
+  /// Resolves a secret name to a path inside the secrets directory.
+  /// Fail closed: the name must be a single plain file name, and the resolved
+  /// path is re-checked for containment. Without this, a name such as
+  /// "..\..\evil" would read, overwrite, or delete files outside the
+  /// secrets directory.
+  /// </summary>
+  private string SecretPath(string name)
+  {
+    ValidateSecretName(name);
+    var path = Path.GetFullPath(Path.Combine(_paths.Secrets, name + ".bin"));
+    var root = Path.GetFullPath(_paths.Secrets);
+    if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+      throw new ArgumentException("Secret name must resolve inside the secrets directory.", nameof(name));
+    return path;
+  }
+
+  /// <summary>Accepts only a single, non-reserved file name component.</summary>
+  public static void ValidateSecretName(string name)
+  {
+    ArgumentException.ThrowIfNullOrWhiteSpace(name);
+    if (name.Length > 128)
+      throw new ArgumentException("Secret name is too long (max 128 characters).", nameof(name));
+    if (name is "." or "..")
+      throw new ArgumentException("Secret name is a reserved path segment.", nameof(name));
+    if (name.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }) >= 0)
+      throw new ArgumentException("Secret name must not contain path or wildcard characters.", nameof(name));
+    if (name.EndsWith(' ') || name.EndsWith('.'))
+      throw new ArgumentException("Secret name must not end with a space or dot.", nameof(name));
+    foreach (var c in name)
+    {
+      if (char.IsControl(c) || char.IsWhiteSpace(c))
+        throw new ArgumentException("Secret name must not contain whitespace or control characters.", nameof(name));
+    }
+    if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+      throw new ArgumentException("Secret name contains characters that are invalid in a file name.", nameof(name));
+  }
 
   public void Save(string name, string password)
   {
-    ArgumentException.ThrowIfNullOrWhiteSpace(name);
+    ValidateSecretName(name);
+    ArgumentNullException.ThrowIfNull(password);
     var plain = Encoding.UTF8.GetBytes(password);
     try
     {
@@ -546,12 +641,21 @@ public sealed class CredentialService
   {
     if (string.IsNullOrWhiteSpace(name))
       return false;
-    return File.Exists(SecretPath(name));
+    try
+    {
+      return File.Exists(SecretPath(name));
+    }
+    catch (ArgumentException)
+    {
+      // Hostile or malformed name: no such secret, and never a probe outside
+      // the secrets directory.
+      return false;
+    }
   }
 
   public bool Delete(string name)
   {
-    ArgumentException.ThrowIfNullOrWhiteSpace(name);
+    ValidateSecretName(name);
     var path = SecretPath(name);
     try
     {
@@ -572,6 +676,7 @@ public sealed class CredentialService
 
   public string? Load(string name)
   {
+    ValidateSecretName(name);
     var path = SecretPath(name);
     if (!File.Exists(path)) return null;
 
@@ -742,46 +847,66 @@ public sealed class ProcessSessionService
       return;
     }
 
+    Process process;
     try
     {
-      using var process = Process.GetProcessById(pid);
-
-      if (!MatchesTrackedProcess(process, account))
-      {
-        _database.Log("WARN", $"PID {pid} no longer matches account '{account.DisplayName}'; refusing to terminate it.");
-        _database.UpdateRuntime(account.Id, "Stopped", null, null, "Tracked process no longer matches.");
-        return;
-      }
-
-      if (!process.HasExited)
-      {
-        try { process.CloseMainWindow(); } catch (InvalidOperationException) { }
-
-        // Killing Start.exe does not stop a sandbox: Sandboxie keeps
-        // box contents alive. Terminate the whole box instead.
-        if (IsSandboxedExecutable(account.ProcessExecutablePath))
-          TerminateBox(account.ProcessExecutablePath, SanitizeBoxName(account));
-
-        if (!process.HasExited && !process.WaitForExit(5000))
-          process.Kill(entireProcessTree: true);
-
-        if (!process.HasExited && !process.WaitForExit(5000))
-          throw new InvalidOperationException("The client process did not terminate.");
-      }
-
-      _database.UpdateRuntime(account.Id, "Stopped", null, null);
-      _database.Log("INFO", $"Stopped account '{account.DisplayName}' (PID {pid}).");
+      process = Process.GetProcessById(pid);
     }
     catch (ArgumentException)
     {
+      // Only "the PID does not exist" lands here. Identity problems are
+      // handled below as a mismatch, so a corrupt row can never masquerade
+      // as a cleanly stopped account.
       _database.UpdateRuntime(account.Id, "Stopped", null, null);
       _database.Log("INFO", $"Account '{account.DisplayName}' process PID {pid} was already gone.");
+      return;
     }
-    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+
+    using (process)
     {
-      _database.UpdateRuntime(account.Id, "Error", pid, account.StartedAtUtc, ex.Message, account.ProcessExecutablePath);
-      _database.Log("ERROR", $"Failed to stop account '{account.DisplayName}' (PID {pid}): {ex.Message}");
-      throw;
+      try
+      {
+        if (!MatchesTrackedProcess(process, account))
+        {
+          _database.Log("WARN", $"PID {pid} no longer matches account '{account.DisplayName}'; refusing to terminate it.");
+          _database.UpdateRuntime(account.Id, "Stopped", null, null, "Tracked process no longer matches.");
+          return;
+        }
+
+        if (!process.HasExited)
+        {
+          try { process.CloseMainWindow(); } catch (InvalidOperationException) { }
+
+          // Killing Start.exe does not stop a sandbox: Sandboxie keeps
+          // box contents alive. Terminate the whole box instead.
+          var boxConfirmed = !IsSandboxedExecutable(account.ProcessExecutablePath) ||
+                             TerminateBox(account.ProcessExecutablePath, SanitizeBoxName(account));
+
+          if (!process.HasExited && !process.WaitForExit(5000))
+            process.Kill(entireProcessTree: true);
+
+          if (!process.HasExited && !process.WaitForExit(5000))
+            throw new InvalidOperationException("The client process did not terminate.");
+
+          if (!boxConfirmed)
+          {
+            // Fail closed: the wrapper is gone but the sandbox contents are not
+            // confirmed dead. Reporting "Stopped" would let the user delete the
+            // profile and orphan a running box.
+            throw new InvalidOperationException(
+                "Sandboxie did not confirm that the sandbox terminated. The account stays in an error state and its profile must not be deleted.");
+          }
+        }
+
+        _database.UpdateRuntime(account.Id, "Stopped", null, null);
+        _database.Log("INFO", $"Stopped account '{account.DisplayName}' (PID {pid}).");
+      }
+      catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+      {
+        _database.UpdateRuntime(account.Id, "Error", pid, account.StartedAtUtc, ex.Message, account.ProcessExecutablePath);
+        _database.Log("ERROR", $"Failed to stop account '{account.DisplayName}' (PID {pid}): {ex.Message}");
+        throw;
+      }
     }
   }
 
@@ -823,39 +948,115 @@ public sealed class ProcessSessionService
     }
   }
 
+  /// <summary>
+  /// Fail-closed identity check. Every recorded signal must be readable and
+  /// must match; an unreadable signal is treated as a mismatch, never as a
+  /// pass. Otherwise a permission error would let Stop kill a process that
+  /// only happens to reuse the tracked PID.
+  /// </summary>
   private static bool MatchesTrackedProcess(Process process, CamfrogAccount account)
   {
     if (account.ProcessId is not int || process.HasExited)
       return false;
 
+    // A recorded PID without a recorded executable is an inconsistent row.
+    // Start always persists the executable path, so refuse rather than act
+    // on PID and start time alone.
+    if (string.IsNullOrWhiteSpace(account.ProcessExecutablePath))
+      return false;
+
     if (account.StartedAtUtc is DateTime expectedStart)
     {
+      DateTime actual;
       try
       {
-        var actual = process.StartTime.ToUniversalTime();
-        if (Math.Abs((actual - expectedStart.ToUniversalTime()).TotalSeconds) > 5)
-          return false;
+        actual = process.StartTime.ToUniversalTime();
       }
-      catch (InvalidOperationException) { }
-      catch (System.ComponentModel.Win32Exception) { }
+      catch (InvalidOperationException)
+      {
+        return false;
+      }
+      catch (System.ComponentModel.Win32Exception)
+      {
+        return false;
+      }
+      if (Math.Abs((actual - expectedStart.ToUniversalTime()).TotalSeconds) > 5)
+        return false;
     }
 
     if (!string.IsNullOrWhiteSpace(account.ProcessExecutablePath))
     {
+      string? actualPath;
       try
       {
-        var actualPath = process.MainModule?.FileName;
-        if (!string.IsNullOrWhiteSpace(actualPath) &&
-            !string.Equals(
-                Path.GetFullPath(actualPath),
-                Path.GetFullPath(account.ProcessExecutablePath),
-                StringComparison.OrdinalIgnoreCase))
-          return false;
+        actualPath = process.MainModule?.FileName;
       }
-      catch (System.ComponentModel.Win32Exception) { }
-      catch (InvalidOperationException) { }
+      catch (System.ComponentModel.Win32Exception)
+      {
+        return false;
+      }
+      catch (InvalidOperationException)
+      {
+        return false;
+      }
+      if (string.IsNullOrWhiteSpace(actualPath))
+        return false;
+
+      // The recorded path comes from the database, which is a trust boundary:
+      // a malformed value must read as a mismatch, not escape as an exception
+      // that a caller could mistake for "the process is gone".
+      string expectedPath;
+      string actualFullPath;
+      try
+      {
+        expectedPath = Path.GetFullPath(account.ProcessExecutablePath);
+        actualFullPath = Path.GetFullPath(actualPath);
+      }
+      catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+      {
+        return false;
+      }
+
+      if (!string.Equals(actualFullPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+        return false;
+    }
+    return true;
+  }
+
+  /// <summary>
+  /// Fail-closed gate for deleting an account and its profile. Deletion is
+  /// only safe when the account is stopped, has no tracked PID left, and has
+  /// no recorded error. Anything else - an unconfirmed sandbox termination, a
+  /// PID that no longer matches, unreadable process identity - keeps the
+  /// profile in place instead of orphaning a live client.
+  /// </summary>
+  public static bool IsDeletionSafe(CamfrogAccount? account, out string? reason)
+  {
+    if (account is null)
+    {
+      reason = "The account no longer exists.";
+      return false;
     }
 
+    if (!account.Status.Equals("Stopped", StringComparison.OrdinalIgnoreCase))
+    {
+      reason = $"The account is '{account.Status}', not stopped.";
+      return false;
+    }
+
+    if (account.ProcessId is not null)
+    {
+      reason = "A process is still tracked for this account.";
+      return false;
+    }
+
+    if (!string.IsNullOrWhiteSpace(account.LastError))
+    {
+      reason = account.LastError;
+      return false;
+    }
+
+    reason = null;
     return true;
   }
 
@@ -1446,12 +1647,20 @@ public sealed class ProcessSessionService
   /// Best-effort termination of everything inside a Sandboxie box.
   /// Never throws: callers fall back to process-tree kill.
   /// </summary>
-  public static void TerminateBox(string startExe, string boxName)
+  /// <summary>
+  /// Asks Sandboxie to terminate every process in a box. Returns true when
+  /// the helper ran and reported success. The exit code is treated as
+  /// advisory only: Start.exe does not document its termination contract, so
+  /// a non-zero code is logged rather than turned into a hard failure that
+  /// would break the normal stop path. Callers that need certainty should
+  /// check the resulting process state.
+  /// </summary>
+  public static bool TerminateBox(string startExe, string boxName)
   {
+    if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
+      return false;
     try
     {
-      if (string.IsNullOrWhiteSpace(startExe) || !File.Exists(startExe))
-        return;
       using var process = Process.Start(new ProcessStartInfo
       {
         FileName = startExe,
@@ -1459,11 +1668,24 @@ public sealed class ProcessSessionService
         UseShellExecute = false,
         CreateNoWindow = true
       });
-      process?.WaitForExit(15000);
+      if (process is null)
+        return false;
+      if (!process.WaitForExit(15000))
+        return false;
+      return process.ExitCode == 0;
     }
-    catch (InvalidOperationException) { }
-    catch (System.ComponentModel.Win32Exception) { }
-    catch (FileNotFoundException) { }
+    catch (InvalidOperationException)
+    {
+      return false;
+    }
+    catch (System.ComponentModel.Win32Exception)
+    {
+      return false;
+    }
+    catch (FileNotFoundException)
+    {
+      return false;
+    }
   }
 
   public static bool IsSandboxedExecutable(string? executablePath) =>

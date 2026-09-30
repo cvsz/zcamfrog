@@ -545,4 +545,7 @@
   <data name="StateEvidenceLabel" xml:space="preserve">
     <value>หลักฐาน</value>
   </data>
+  <data name="MsgStopBeforeDelete" xml:space="preserve">
+    <value>บัญชี '{0}' ยังทำงานอยู่ จึงไม่ได้ลบ{0}{1}กรุณาหยุดก่อน แล้วจึงลบ เพื่อไม่ให้ Sandboxie ที่ยังทำงานค้างอยู่โดยไม่มีข้อมูลกำลังติดตาม</value>
+  </data>
 </root>

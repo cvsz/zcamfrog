@@ -43,6 +43,12 @@ if (-not (Test-Path -LiteralPath $exe)) {
     throw "Published executable was not created: $exe"
 }
 
+Write-Host 'Verifying publish allow-list...' -ForegroundColor Yellow
+& (Join-Path $PSScriptRoot 'scripts\verify-publish.ps1') -PublishDir $publishDir
+if ($LASTEXITCODE -ne 0) {
+    throw "Publish verification failed with exit code $LASTEXITCODE."
+}
+
 Write-Host ''
 Write-Host 'BUILD SUCCESS' -ForegroundColor Green
 Write-Host "Executable: $exe"

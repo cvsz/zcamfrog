@@ -270,7 +270,7 @@ public partial class MainWindow : Window
       var exe = App.Settings.Load().ClientExecutable;
       if (!string.IsNullOrWhiteSpace(exe))
         snapshot = ProcessSessionService.GetClientProcessSnapshot(exe);
-      }
+    }
     catch (IOException) { }
     catch (UnauthorizedAccessException) { }
 
@@ -301,9 +301,9 @@ public partial class MainWindow : Window
         account.RoomDisplay = ProcessSessionService.ParseRoomName(account.RoomUrl);
         account.StateEvidence = string.Empty;
       }
-        UntrackedBanner.Text = string.Empty;
-        UntrackedBanner.Visibility = Visibility.Collapsed;
-        return;
+      UntrackedBanner.Text = string.Empty;
+      UntrackedBanner.Visibility = Visibility.Collapsed;
+      return;
     }
 
     foreach (var account in all)
@@ -495,8 +495,30 @@ public partial class MainWindow : Window
       // Stop first if still tracked alive; fail-closed Stop refuses foreign PIDs.
       if (fresh.ProcessId is int)
       {
-        try { App.Sessions.Stop(fresh); } catch { }
+        try
+        {
+          App.Sessions.Stop(fresh);
+        }
+        catch (Exception stopEx)
+        {
+          // Never delete the tracking row for a process that is still
+          // running: the sandbox would keep running unmanageable.
+          MessageBox.Show(
+              L10n.Fmt(Strings.MsgStopBeforeDelete, fresh.DisplayName, Environment.NewLine, stopEx.Message),
+              Strings.TitleDeleteError, MessageBoxButton.OK, MessageBoxImage.Warning);
+          return;
+        }
         fresh = App.Db.GetById(fresh.Id) ?? fresh;
+      }
+
+      // Stop can report "Stopped" while still recording why it could not
+      // confirm termination, so the gate checks state, PID and error together.
+      if (!ProcessSessionService.IsDeletionSafe(fresh, out var unsafeReason))
+      {
+        MessageBox.Show(
+            L10n.Fmt(Strings.MsgStopBeforeDelete, fresh.DisplayName, Environment.NewLine, unsafeReason),
+            Strings.TitleDeleteError, MessageBoxButton.OK, MessageBoxImage.Warning);
+        return;
       }
 
       var secretName = fresh.PasswordSecretName;

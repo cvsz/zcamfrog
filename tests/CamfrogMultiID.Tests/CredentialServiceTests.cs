@@ -104,4 +104,71 @@ public sealed class CredentialServiceTests : IDisposable
     _svc.Save("long", longPwd);
     Assert.Equal(longPwd, _svc.Load("long"));
   }
+
+  [Theory]
+  [InlineData("..")]
+  [InlineData(".")]
+  [InlineData("../evil")]
+  [InlineData("..\\evil")]
+  [InlineData("a/b")]
+  [InlineData("a\\b")]
+  [InlineData("C:evil")]
+  [InlineData("\\\\server\\share\\evil")]
+  [InlineData("sub\\..\\..\\evil")]
+  [InlineData("evil*")]
+  [InlineData("evil?")]
+  [InlineData("evil\"x")]
+  [InlineData("evil|x")]
+  [InlineData("evil ")]
+  [InlineData("evil.")]
+  [InlineData("evil\tx")]
+  [InlineData("evil\nx")]
+  public void HostileName_NeverEscapesSecretsDirectory(string name)
+  {
+    // Regression: SecretPath used Path.Combine directly, so a traversing
+    // name could read, overwrite, or delete files outside the secrets dir.
+    var outside = Path.Combine(_tempRoot, "outside.bin");
+    File.WriteAllText(outside, "untouched");
+    var before = Directory.GetFiles(_tempRoot, "*", SearchOption.AllDirectories)
+        .Select(f => f)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    Assert.ThrowsAny<ArgumentException>(() => _svc.Save(name, "pwd"));
+    Assert.ThrowsAny<ArgumentException>(() => _svc.Load(name));
+    Assert.ThrowsAny<ArgumentException>(() => _svc.Delete(name));
+    Assert.False(_svc.Exists(name));
+
+    Assert.Equal("untouched", File.ReadAllText(outside));
+    var created = Directory.GetFiles(_tempRoot, "*", SearchOption.AllDirectories)
+        .Where(f => !before.Contains(f))
+        .ToList();
+    Assert.Empty(created);
+  }
+
+  [Fact]
+  public void HostileName_DoesNotDeleteExistingOutsideFile()
+  {
+    var outside = Path.Combine(_tempRoot, "keep.bin");
+    File.WriteAllText(outside, "keep");
+    Assert.ThrowsAny<ArgumentException>(() => _svc.Delete("..\\keep"));
+    Assert.True(File.Exists(outside));
+  }
+
+  [Fact]
+  public void ValidName_IsAcceptedAndContained()
+  {
+    _svc.Save("user_1", "pw");
+    Assert.Equal("pw", _svc.Load("user_1"));
+    Assert.True(_svc.Exists("user_1"));
+    Assert.True(File.Exists(Path.Combine(_paths.Secrets, "user_1.bin")));
+    Assert.True(_svc.Delete("user_1"));
+    Assert.False(_svc.Exists("user_1"));
+  }
+
+  [Fact]
+  public void ValidateSecretName_RejectsOverlongName()
+  {
+    Assert.ThrowsAny<ArgumentException>(() => CredentialService.ValidateSecretName(new string('a', 129)));
+    CredentialService.ValidateSecretName(new string('a', 128));
+  }
 }

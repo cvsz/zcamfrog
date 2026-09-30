@@ -123,30 +123,30 @@ public sealed class DatabaseServiceTests : IDisposable
     Assert.Empty(_db.GetAccounts());
   }
 
-    [Fact]
-    public void SchemaVersion_MatchesExpected()
-    {
-        Assert.Equal(DatabaseService.SchemaVersion, _db.GetSchemaVersion());
-    }
+  [Fact]
+  public void SchemaVersion_MatchesExpected()
+  {
+    Assert.Equal(DatabaseService.SchemaVersion, _db.GetSchemaVersion());
+  }
 
-    [Fact]
-    public void Initialize_MalformedDatabase_ThrowsSqliteException()
+  [Fact]
+  public void Initialize_MalformedDatabase_ThrowsSqliteException()
+  {
+    // Callers (App startup) catch and degrade; the layer must fail with
+    // a typed error, never undefined behavior.
+    var badRoot = Path.Combine(Path.GetTempPath(), "zcamfrog-tests-bad-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(badRoot);
+    try
     {
-        // Callers (App startup) catch and degrade; the layer must fail with
-        // a typed error, never undefined behavior.
-        var badRoot = Path.Combine(Path.GetTempPath(), "zcamfrog-tests-bad-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(badRoot);
-        try
-        {
-            File.WriteAllText(Path.Combine(badRoot, "camfrog.db"), "not a database at all");
-            var badDb = new DatabaseService(new AppPaths(badRoot));
-            Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => badDb.Initialize());
-        }
-        finally
-        {
-            try { Directory.Delete(badRoot, true); } catch { }
-        }
+      File.WriteAllText(Path.Combine(badRoot, "camfrog.db"), "not a database at all");
+      var badDb = new DatabaseService(new AppPaths(badRoot));
+      Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => badDb.Initialize());
     }
+    finally
+    {
+      try { Directory.Delete(badRoot, true); } catch { }
+    }
+  }
 
   [Fact]
   public void UpdateDetails_ValidatesDomain()
@@ -202,6 +202,49 @@ public sealed class DatabaseServiceTests : IDisposable
     Assert.Equal(1234, acc.ProcessId);
   }
 
+  [Fact]
+  public void Initialize_RefusesNewerSchema()
+  {
+    SetUserVersion(DatabaseService.SchemaVersion + 1);
+    var service = new DatabaseService(_paths);
+
+    var ex = Assert.Throws<NotSupportedException>(() => service.Initialize());
+    Assert.Contains("Upgrade the manager", ex.Message, StringComparison.Ordinal);
+
+    // The newer version marker must survive untouched.
+    Assert.Equal(DatabaseService.SchemaVersion + 1, service.GetSchemaVersion());
+  }
+
+  [Fact]
+  public void Initialize_UpgradesOlderSchema()
+  {
+    SetUserVersion(DatabaseService.SchemaVersion - 1);
+    var service = new DatabaseService(_paths);
+
+    service.Initialize();
+
+    Assert.Equal(DatabaseService.SchemaVersion, service.GetSchemaVersion());
+  }
+
+  [Fact]
+  public void Initialize_IsIdempotent()
+  {
+    var service = new DatabaseService(_paths);
+    service.Initialize();
+    service.Initialize();
+
+    Assert.Equal(DatabaseService.SchemaVersion, service.GetSchemaVersion());
+  }
+
+  private void SetUserVersion(int version)
+  {
+    using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_paths.Database}");
+    connection.Open();
+    using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA user_version = {version};";
+    command.ExecuteNonQuery();
+  }
+
   private CamfrogAccount NewAccount(string username, string? secret = null)
   {
     var s = secret ?? "secret_" + Guid.NewGuid().ToString("N");
@@ -213,5 +256,44 @@ public sealed class DatabaseServiceTests : IDisposable
       ProfileDirectory = Path.Combine(_paths.Profiles, Guid.NewGuid().ToString("N")),
       Enabled = true
     };
+  }
+
+  [Fact]
+  public void Add_RejectsHostileRoomUrl()
+  {
+    // The UI validates, but the database is the trust boundary: a direct
+    // call must not persist a non-camfrog scheme.
+    foreach (var evil in new[] { "shell:open", "powershell:-c", "file:///c:/x", "https://evil.example" })
+    {
+      var acc = NewAccount("u_room_" + Guid.NewGuid().ToString("N"));
+      acc.RoomUrl = evil;
+      Assert.Throws<InvalidOperationException>(() => _db.Add(acc));
+    }
+    Assert.DoesNotContain(_db.GetAccounts(), a => a.RoomUrl.Length > 0);
+  }
+
+  [Fact]
+  public void Add_NormalizesRoomUrl()
+  {
+    var acc = NewAccount("u_norm_" + Guid.NewGuid().ToString("N"));
+    acc.RoomUrl = "  camfrog://join_room/?name=R  ";
+    var id = _db.Add(acc);
+    Assert.Equal("camfrog://join_room/?name=R", _db.GetById(id)!.RoomUrl);
+  }
+
+  [Fact]
+  public void Add_RejectsProfileDirectoryOutsideManagedRoot()
+  {
+    var acc = NewAccount("u_prof_" + Guid.NewGuid().ToString("N"));
+    acc.ProfileDirectory = Path.Combine(Path.GetTempPath(), "not-managed-" + Guid.NewGuid().ToString("N"));
+    Assert.Throws<ArgumentException>(() => _db.Add(acc));
+  }
+
+  [Fact]
+  public void Add_RejectsTraversingSecretName()
+  {
+    var acc = NewAccount("u_sec_" + Guid.NewGuid().ToString("N"));
+    acc.PasswordSecretName = "..\\..\\evil";
+    Assert.Throws<ArgumentException>(() => _db.Add(acc));
   }
 }
