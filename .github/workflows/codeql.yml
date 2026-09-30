@@ -35,7 +35,8 @@ jobs:
         if: matrix.language == 'csharp'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 8.0.x
+          # Pinned by global.json so the analyzer set matches the CI build job.
+          global-json-file: global.json
 
       - name: Initialize CodeQL
         if: matrix.language == 'csharp' || matrix.language == 'actions'
@@ -53,6 +54,9 @@ jobs:
         if: matrix.build-mode == 'manual'
         shell: pwsh
         run: |
+          # Restore the solution first: building it without this leaves the
+          # test project without a project.assets.json and the build fails.
+          dotnet restore CamfrogMultiID.sln --verbosity minimal
           dotnet restore src/CamfrogMultiID.App/CamfrogMultiID.App.csproj --force-evaluate -r win-x64
           dotnet build CamfrogMultiID.sln -c Release --no-restore --verbosity minimal
 

@@ -71,6 +71,15 @@ about what the third-party Camfrog client can and cannot do.
 - Ordinary restore does not cover the `win-x64` publish graph; always
   also run `dotnet restore src/.../CamfrogMultiID.App.csproj
   --force-evaluate -r win-x64` before publish.
+- The `win-x64` restore rewrites the assets of the projects it pulls in, so
+  any workflow that builds the solution afterwards must restore the solution
+  first. CodeQL's manual build previously failed with
+  `Assets file 'tests/.../project.assets.json' not found` for this reason.
+- Without `global.json`, `dotnet` on a GitHub runner silently uses the newest
+  SDK its image ships, not the one `setup-dotnet` installed. A newer analyzer
+  set then enables new `AnalysisLevel=latest-recommended` rules (CA1859 broke
+  the Debug build in run 67 while the local build stayed green). `global.json`
+  pins the SDK; never replace it with `dotnet-version: 8.0.x` in a workflow.
 - The running app locks its own single-file `publish\CamfrogMultiID.exe`;
   stop it before republishing.
 - Test project is the only place `NoWarn` is acceptable

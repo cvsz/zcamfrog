@@ -34,6 +34,7 @@ jobs:
             .github/PULL_REQUEST_TEMPLATE.md
             .github/dependabot.yml
             CamfrogMultiID.sln
+            global.json
             src/CamfrogMultiID.Core/CamfrogMultiID.Core.csproj
             src/CamfrogMultiID.Infrastructure/CamfrogMultiID.Infrastructure.csproj
             src/CamfrogMultiID.App/CamfrogMultiID.App.csproj
@@ -86,7 +87,10 @@ jobs:
       - name: Setup .NET 8
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 8.0.x
+          # global.json is authoritative: without it the runner silently uses
+          # whichever SDK its image happens to ship, and a newer analyzer set
+          # turns new CA rules into build failures that never reproduce locally.
+          global-json-file: global.json
 
       - name: Display .NET info
         shell: pwsh

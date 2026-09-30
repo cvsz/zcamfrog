@@ -1354,7 +1354,7 @@ public sealed class ProcessSessionService
 
   private static (AccountRuntimeState State, string Evidence) ResolveOne(
       CamfrogAccount account,
-      IReadOnlyList<ClientProcessInfo> mine,
+      List<ClientProcessInfo> mine,
       bool trackedAlive,
       string roomName,
       bool hasTrackedPid)

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 - Windows 10/11 x64
-- .NET SDK 8.0.425+ (`dotnet --info` should show `8.0.4xx` and `Microsoft.WindowsDesktop.App 8.0.x`)
+- .NET SDK 8.0.425+ (`dotnet --info` should show `8.0.4xx` and `Microsoft.WindowsDesktop.App 8.0.x`). `global.json` pins the exact SDK so local and CI analyzers stay identical; a newer SDK silently enables extra `latest-recommended` rules and can fail CI only
 - No admin required; WPF builds need Windows desktop workload (included in .NET 8 SDK).
 
 ## Local setup
