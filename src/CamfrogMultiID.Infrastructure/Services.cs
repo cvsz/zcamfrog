@@ -1223,8 +1223,14 @@ public sealed class ProcessSessionService
     var handles = new List<Process>();
     try
     {
-      foreach (var info in result)
+      // Updating an element through List<T>'s indexer increments its version.
+      // A foreach enumerator then throws "Collection was modified" as soon as
+      // any client has a window title, aborting the whole UI refresh before
+      // the account grid is rebound. Use an index-based loop for in-place
+      // enrichment instead.
+      for (var index = 0; index < result.Count; index++)
       {
+        var info = result[index];
         Process proc;
         try
         {
@@ -1240,7 +1246,7 @@ public sealed class ProcessSessionService
         catch (InvalidOperationException) { continue; }
         catch (System.ComponentModel.Win32Exception) { continue; }
         if (!string.IsNullOrEmpty(title))
-          result[result.IndexOf(info)] = info with { MainWindowTitle = title };
+          result[index] = info with { MainWindowTitle = title };
       }
     }
     finally

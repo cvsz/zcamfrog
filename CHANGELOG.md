@@ -20,6 +20,7 @@ All notable changes to Camfrog Multi-ID Manager are documented here. Based on Ke
 - A database written by a newer schema version is refused instead of being stamped with an older version; the whole migration runs in one transaction
 
 ### Fixed
+- Runtime refresh no longer modifies the client-process list during enumeration while attaching window titles; account rows now continue to populate when Camfrog windows are open.
 - CI no longer drifts from local builds: `global.json` pins the .NET SDK so the runner cannot silently use a newer analyzer set (a new `latest-recommended` rule, CA1859, failed run 67's Debug build while the local build was green). `actions/setup-dotnet` now reads the pin via `global-json-file`
 - The CI publish step re-runs the `win-x64` restore and asserts the RID target before `dotnet publish --no-restore`. Generating the SBOM restores the solution through MSBuild, which silently removed the `win-x64` target and failed the publish with `NETSDK1047`
 - CodeQL's manual C# build restores the solution before the `win-x64` graph, so the test project is no longer left without `project.assets.json`
